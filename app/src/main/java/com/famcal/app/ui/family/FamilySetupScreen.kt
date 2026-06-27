@@ -28,7 +28,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun FamilySetupScreen(viewModel: FamilySetupViewModel = hiltViewModel()) {
+fun FamilySetupScreen(
+    onClose: (() -> Unit)? = null,
+    viewModel: FamilySetupViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Column(
@@ -95,7 +98,7 @@ fun FamilySetupScreen(viewModel: FamilySetupViewModel = hiltViewModel()) {
 
         Spacer(Modifier.height(24.dp))
         Button(
-            onClick = viewModel::submit,
+            onClick = { viewModel.submit(onDone = { onClose?.invoke() }) },
             enabled = state.canSubmit,
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -111,8 +114,10 @@ fun FamilySetupScreen(viewModel: FamilySetupViewModel = hiltViewModel()) {
         }
 
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = viewModel::signOut) {
-            Text("Sign out")
+        if (onClose != null) {
+            TextButton(onClick = onClose) { Text("Cancel") }
+        } else {
+            TextButton(onClick = viewModel::signOut) { Text("Sign out") }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.famcal.app.ui.family
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.famcal.app.data.ActiveFamilyStore
 import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.family.FamilyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,6 +32,7 @@ data class FamilySetupState(
 class FamilySetupViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val familyRepository: FamilyRepository,
+    private val activeFamilyStore: ActiveFamilyStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(FamilySetupState())
@@ -42,7 +44,7 @@ class FamilySetupViewModel @Inject constructor(
 
     fun setJoining(joining: Boolean) = _state.update { it.copy(isJoining = joining, error = null) }
 
-    fun submit() {
+    fun submit(onDone: () -> Unit = {}) {
         val current = _state.value
         val user = authRepository.currentUser
         if (!current.canSubmit || user == null) return
@@ -53,12 +55,18 @@ class FamilySetupViewModel @Inject constructor(
             } else {
                 familyRepository.createFamily(current.familyName, user)
             }
-            // Success routes away automatically once the family appears in the live query.
-            result.onFailure { e ->
-                _state.update {
-                    it.copy(error = e.message ?: "Couldn't complete that. Please try again.")
+            result
+                .onSuccess { family ->
+                    // Make the new family active; the initial-setup case also re-routes
+                    // automatically once it appears in the live family query.
+                    activeFamilyStore.setActiveFamilyId(family.id)
+                    onDone()
                 }
-            }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(error = e.message ?: "Couldn't complete that. Please try again.")
+                    }
+                }
             _state.update { it.copy(isSubmitting = false) }
         }
     }

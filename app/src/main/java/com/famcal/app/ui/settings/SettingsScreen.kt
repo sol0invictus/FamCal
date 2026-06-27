@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onManageFamilies: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -114,6 +115,13 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            }
+
+            OutlinedButton(
+                onClick = onManageFamilies,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Manage families")
             }
 
             OutlinedButton(

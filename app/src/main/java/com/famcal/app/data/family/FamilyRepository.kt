@@ -150,6 +150,20 @@ class FamilyRepository @Inject constructor(
         familyRef.get().await().toObject(Family::class.java) ?: error("Family is unreadable")
     }
 
+    /** Removes the current user from a family (and their member doc + familyIds entry). */
+    suspend fun leaveFamily(familyId: String, user: FirebaseUser): Result<Unit> = runCatching {
+        val ref = families.document(familyId)
+        firestore.runBatch { batch ->
+            batch.update(ref, "memberUids", FieldValue.arrayRemove(user.uid))
+            batch.delete(ref.collection(SUBCOLLECTION_MEMBERS).document(user.uid))
+            batch.set(
+                users.document(user.uid),
+                mapOf("familyIds" to FieldValue.arrayRemove(familyId)),
+                SetOptions.merge(),
+            )
+        }.await()
+    }
+
     /** Ensures the family has a feed token for the iCal subscription URL; creates one if missing. */
     suspend fun ensureFeedToken(familyId: String): Result<String> = runCatching {
         val ref = families.document(familyId)

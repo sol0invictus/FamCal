@@ -8,6 +8,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.famcal.app.ui.calendar.CalendarScreen
 import com.famcal.app.ui.event.EventEditorScreen
+import com.famcal.app.ui.family.FamiliesScreen
+import com.famcal.app.ui.family.FamilySetupScreen
 import com.famcal.app.ui.settings.SettingsScreen
 import java.time.ZoneId
 
@@ -44,7 +46,21 @@ fun MainNavHost(familyId: String) {
             route = "settings/{familyId}",
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onManageFamilies = { navController.navigate("families") },
+            )
+        }
+
+        composable("families") {
+            FamiliesScreen(
+                onBack = { navController.popBackStack() },
+                onAddFamily = { navController.navigate("addFamily") },
+            )
+        }
+
+        composable("addFamily") {
+            FamilySetupScreen(onClose = { navController.popBackStack() })
         }
 
         composable(

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -25,7 +26,12 @@ fun FamCalRoot(viewModel: AppViewModel = hiltViewModel()) {
         AppUiState.Loading -> LoadingScreen()
         AppUiState.SignedOut -> AuthScreen()
         AppUiState.NeedsFamily -> FamilySetupScreen()
-        is AppUiState.Ready -> MainNavHost(familyId = current.families.first().id)
+        is AppUiState.Ready ->
+            // Rebuild the nav graph when the active family changes so each family gets
+            // its own fresh back stack starting at its calendar.
+            key(current.activeFamilyId) {
+                MainNavHost(familyId = current.activeFamilyId)
+            }
     }
 }
 
