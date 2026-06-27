@@ -30,7 +30,12 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(./gradlew :app:bundleRelease)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(mkdir -p /Users/sunnyguha/Documents/FamCal-keystore-backup)",
+      "Bash(cp /Users/sunnyguha/projects/familycalendar/app/upload-keystore.jks /Users/sunnyguha/Documents/FamCal-keystore-backup/)",
+      "Bash(cp /Users/sunnyguha/projects/familycalendar/keystore.properties /Users/sunnyguha/Documents/FamCal-keystore-backup/)",
+      "Bash(cat)",
+      "Bash(chmod 600 /Users/sunnyguha/Documents/FamCal-keystore-backup/*)"
     ]
   }
 }

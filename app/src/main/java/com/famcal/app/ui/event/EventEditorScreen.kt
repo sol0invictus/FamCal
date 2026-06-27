@@ -63,6 +63,7 @@ fun EventEditorScreen(
     viewModel: EventEditorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val members by viewModel.members.collectAsStateWithLifecycle()
     var picker by remember { mutableStateOf(PickerTarget.None) }
 
     Scaffold(
@@ -105,6 +106,19 @@ fun EventEditorScreen(
                 Text("All day", modifier = Modifier.weight(1f))
                 Switch(checked = state.allDay, onCheckedChange = viewModel::onAllDayChange)
             }
+
+            val assigneeOptions = remember(members) {
+                listOf("" to "Anyone") +
+                    members.map { it.uid to it.displayName.ifBlank { it.email.substringBefore("@") } }
+            }
+            OptionSelector(
+                label = "For",
+                options = assigneeOptions,
+                optionLabel = { it.second },
+                selected = assigneeOptions.firstOrNull { it.first == state.assignedTo }
+                    ?: assigneeOptions.first(),
+                onSelect = { viewModel.onAssignedToChange(it.first) },
+            )
 
             DateTimeRow(
                 label = "Starts",

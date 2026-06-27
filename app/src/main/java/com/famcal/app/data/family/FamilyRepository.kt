@@ -150,6 +150,11 @@ class FamilyRepository @Inject constructor(
         familyRef.get().await().toObject(Family::class.java) ?: error("Family is unreadable")
     }
 
+    /** Renames a family. */
+    suspend fun renameFamily(familyId: String, name: String): Result<Unit> = runCatching {
+        families.document(familyId).update("name", name.trim()).await()
+    }
+
     /** Removes the current user from a family (and their member doc + familyIds entry). */
     suspend fun leaveFamily(familyId: String, user: FirebaseUser): Result<Unit> = runCatching {
         val ref = families.document(familyId)

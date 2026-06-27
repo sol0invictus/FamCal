@@ -102,6 +102,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun renameFamily(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { familyRepository.renameFamily(familyId, name) }
+    }
+
     fun signOut() = authRepository.signOut()
 
     fun deleteAccount() {

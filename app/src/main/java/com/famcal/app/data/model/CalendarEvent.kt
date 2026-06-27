@@ -18,9 +18,14 @@ data class CalendarEvent(
     val endAt: Timestamp = Timestamp.now(),
     val allDay: Boolean = false,
     val createdBy: String = "",
+    /** uid this event is "for"; blank means it falls back to [createdBy] for coloring. */
+    val assignedTo: String = "",
     /** Minutes before start to remind; -1 means no reminder, 0 means at start time. */
     val reminderMinutes: Int = -1,
     /** One of [Recurrence] values: NONE / DAILY / WEEKLY / MONTHLY. */
     val recurrence: String = Recurrence.NONE,
     @ServerTimestamp val updatedAt: Date? = null,
-)
+) {
+    /** Which member's color represents this event. */
+    val colorUid: String get() = assignedTo.ifBlank { createdBy }
+}

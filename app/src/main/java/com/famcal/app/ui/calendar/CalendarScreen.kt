@@ -2,6 +2,8 @@ package com.famcal.app.ui.calendar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +24,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -45,6 +51,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.famcal.app.data.model.Recurrence
+import com.famcal.app.data.model.Reminders
 import com.famcal.app.ui.theme.MemberColors
 import com.famcal.app.util.EventOccurrence
 import com.famcal.app.util.formatDate
@@ -103,7 +111,12 @@ fun CalendarScreen(
                 month = visibleMonth,
                 onPrevious = { scope.launch { calendarState.animateScrollToMonth(visibleMonth.minusMonths(1)) } },
                 onNext = { scope.launch { calendarState.animateScrollToMonth(visibleMonth.plusMonths(1)) } },
+                onToday = {
+                    scope.launch { calendarState.animateScrollToMonth(YearMonth.now()) }
+                    viewModel.selectDate(LocalDate.now())
+                },
             )
+            MemberLegend(state)
             WeekdayHeader()
             HorizontalCalendar(
                 state = calendarState,
@@ -120,7 +133,7 @@ fun CalendarScreen(
             AgendaSection(
                 date = state.selectedDate,
                 occurrences = state.selectedDayEvents,
-                colorFor = { occ -> memberColor(state, occ.event.createdBy) },
+                colorFor = { occ -> memberColor(state, occ.event.colorUid) },
                 onEventClick = onEventClick,
             )
         }
@@ -128,7 +141,7 @@ fun CalendarScreen(
 }
 
 private fun eventColorsFor(state: CalendarUiState, date: LocalDate): List<Color> =
-    state.eventsByDay[date].orEmpty().map { memberColor(state, it.event.createdBy) }
+    state.eventsByDay[date].orEmpty().map { memberColor(state, it.event.colorUid) }
 
 private fun memberColor(state: CalendarUiState, uid: String): Color {
     val index = state.membersByUid[uid]?.colorIndex ?: 0
@@ -140,9 +153,10 @@ private fun MonthHeader(
     month: YearMonth,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onToday: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onPrevious) {
@@ -154,8 +168,40 @@ private fun MonthHeader(
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f),
         )
+        IconButton(onClick = onToday) {
+            Icon(Icons.Filled.Today, contentDescription = "Jump to today")
+        }
         IconButton(onClick = onNext) {
             Icon(Icons.Filled.ChevronRight, contentDescription = "Next month")
+        }
+    }
+}
+
+@Composable
+private fun MemberLegend(state: CalendarUiState) {
+    val members = state.membersByUid.values.toList()
+    if (members.size < 2) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        members.forEach { member ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(MemberColors[member.colorIndex % MemberColors.size]),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = member.displayName.ifBlank { member.email.substringBefore("@") },
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
     }
 }
@@ -241,9 +287,20 @@ private fun AgendaSection(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
         if (occurrences.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    Icons.Filled.EventAvailable,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "No events. Tap + to add one.",
+                    text = "Nothing planned. Tap + to add an event.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -283,7 +340,7 @@ private fun AgendaRow(
                 .background(color),
         )
         Spacer(Modifier.width(12.dp))
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = occurrence.event.title.ifBlank { "(untitled)" },
                 style = MaterialTheme.typography.bodyLarge,
@@ -292,6 +349,23 @@ private fun AgendaRow(
                 text = timeLabel(occurrence),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (occurrence.event.recurrence != Recurrence.NONE) {
+            Icon(
+                Icons.Filled.Repeat,
+                contentDescription = "Repeats",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        if (occurrence.event.reminderMinutes != Reminders.NONE) {
+            Icon(
+                Icons.Filled.Notifications,
+                contentDescription = "Has a reminder",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
             )
         }
     }

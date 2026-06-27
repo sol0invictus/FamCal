@@ -5,15 +5,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.event.EventRepository
+import com.famcal.app.data.family.FamilyRepository
 import com.famcal.app.data.model.CalendarEvent
+import com.famcal.app.data.model.Member
 import com.famcal.app.data.model.Recurrence
 import com.famcal.app.data.model.Reminders
 import com.famcal.app.util.toLocalDateTime
 import com.famcal.app.util.toTimestamp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -27,6 +31,7 @@ data class EventFormState(
     val location: String = "",
     val notes: String = "",
     val allDay: Boolean = false,
+    val assignedTo: String = "",
     val reminderMinutes: Int = Reminders.NONE,
     val recurrence: String = Recurrence.NONE,
     val start: LocalDateTime = defaultStart(),
@@ -50,9 +55,14 @@ class EventEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val eventRepository: EventRepository,
+    familyRepository: FamilyRepository,
 ) : ViewModel() {
 
     private val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId required" }
+
+    /** Family members available to assign an event to. */
+    val members: StateFlow<List<Member>> = familyRepository.observeMembers(familyId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val eventId: String? = savedStateHandle.get<String>("eventId")?.takeIf { it.isNotBlank() }
     private val dateMillis: Long = savedStateHandle.get<Long>("dateMillis") ?: -1L
 
@@ -92,6 +102,7 @@ class EventEditorViewModel @Inject constructor(
                             location = event.location,
                             notes = event.notes,
                             allDay = event.allDay,
+                            assignedTo = event.assignedTo,
                             reminderMinutes = event.reminderMinutes,
                             recurrence = event.recurrence,
                             start = event.startAt.toLocalDateTime(),
@@ -111,6 +122,7 @@ class EventEditorViewModel @Inject constructor(
     fun onNotesChange(value: String) = _state.update { it.copy(notes = value) }
 
     fun onAllDayChange(value: Boolean) = _state.update { it.copy(allDay = value) }
+    fun onAssignedToChange(uid: String) = _state.update { it.copy(assignedTo = uid) }
     fun onReminderChange(minutes: Int) = _state.update { it.copy(reminderMinutes = minutes) }
     fun onRecurrenceChange(recurrence: String) = _state.update { it.copy(recurrence = recurrence) }
 
@@ -144,6 +156,7 @@ class EventEditorViewModel @Inject constructor(
                 endAt = current.end.toTimestamp(),
                 allDay = current.allDay,
                 createdBy = createdBy,
+                assignedTo = current.assignedTo,
                 reminderMinutes = current.reminderMinutes,
                 recurrence = current.recurrence,
             )

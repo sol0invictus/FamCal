@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -54,6 +55,8 @@ fun SettingsScreen(
     val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
     var showCalendarPicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showRename by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
 
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -108,6 +111,12 @@ fun SettingsScreen(
                     onCopy = { clipboard.setText(AnnotatedString(state.inviteCode)) },
                     enabled = state.inviteCode.isNotBlank(),
                 )
+                TextButton(
+                    onClick = {
+                        renameText = state.familyName
+                        showRename = true
+                    },
+                ) { Text("Rename family") }
             }
 
             Section("Add to Google or Outlook") {
@@ -200,6 +209,33 @@ fun SettingsScreen(
                 Text("Delete account", color = MaterialTheme.colorScheme.error)
             }
         }
+    }
+
+    if (showRename) {
+        AlertDialog(
+            onDismissRequest = { showRename = false },
+            title = { Text("Rename family") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text("Family name") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.renameFamily(renameText)
+                        showRename = false
+                    },
+                    enabled = renameText.isNotBlank(),
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRename = false }) { Text("Cancel") }
+            },
+        )
     }
 
     if (showDeleteConfirm) {
