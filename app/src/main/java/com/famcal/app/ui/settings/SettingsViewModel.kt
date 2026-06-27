@@ -5,12 +5,18 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.famcal.app.data.auth.AuthRepository
+import com.famcal.app.data.calendar.CalendarMirror
+import com.famcal.app.data.calendar.CalendarSyncStore
+import com.famcal.app.data.calendar.DeviceCalendar
+import com.famcal.app.data.event.EventRepository
 import com.famcal.app.data.family.FamilyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,6 +27,8 @@ data class SettingsUiState(
     val familyName: String = "",
     val inviteCode: String = "",
     val feedUrl: String? = null,
+    val calendarSyncEnabled: Boolean = false,
+    val calendarSyncName: String = "",
 )
 
 @HiltViewModel
@@ -29,6 +37,9 @@ class SettingsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val familyRepository: FamilyRepository,
+    private val eventRepository: EventRepository,
+    private val calendarMirror: CalendarMirror,
+    private val calendarSyncStore: CalendarSyncStore,
 ) : ViewModel() {
 
     private val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId required" }
@@ -36,25 +47,54 @@ class SettingsViewModel @Inject constructor(
     private val email = authRepository.currentUser?.email.orEmpty()
     private val projectId = readProjectId(context)
 
-    val uiState: StateFlow<SettingsUiState> = familyRepository.observeFamily(familyId)
-        .map { family ->
-            SettingsUiState(
-                displayName = displayName,
-                email = email,
-                familyName = family?.name.orEmpty(),
-                inviteCode = family?.inviteCode.orEmpty(),
-                feedUrl = feedUrl(family?.feedToken),
-            )
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = SettingsUiState(displayName = displayName, email = email),
+    private val _availableCalendars = MutableStateFlow<List<DeviceCalendar>>(emptyList())
+    val availableCalendars: StateFlow<List<DeviceCalendar>> = _availableCalendars.asStateFlow()
+
+    val uiState: StateFlow<SettingsUiState> = combine(
+        familyRepository.observeFamily(familyId),
+        calendarSyncStore.settings,
+    ) { family, sync ->
+        SettingsUiState(
+            displayName = displayName,
+            email = email,
+            familyName = family?.name.orEmpty(),
+            inviteCode = family?.inviteCode.orEmpty(),
+            feedUrl = feedUrl(family?.feedToken),
+            calendarSyncEnabled = sync.enabled,
+            calendarSyncName = sync.calendarName,
         )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = SettingsUiState(displayName = displayName, email = email),
+    )
 
     init {
-        // Generate the subscription token if this family doesn't have one yet.
         viewModelScope.launch { familyRepository.ensureFeedToken(familyId) }
+    }
+
+    fun hasCalendarPermission(): Boolean = calendarMirror.hasPermission()
+
+    /** Loads the device's writable calendars for the picker (call after permission granted). */
+    fun loadCalendars() {
+        viewModelScope.launch { _availableCalendars.value = calendarMirror.listCalendars() }
+    }
+
+    fun enableCalendarSync(calendar: DeviceCalendar) {
+        calendarSyncStore.enable(calendar.id, "${calendar.displayName} (${calendar.accountName})")
+        // Push the current events immediately.
+        viewModelScope.launch {
+            eventRepository.getEventsOnce(familyId).onSuccess { events ->
+                calendarMirror.sync(familyId, events)
+            }
+        }
+    }
+
+    fun disableCalendarSync() {
+        viewModelScope.launch {
+            calendarMirror.clearAll()
+            calendarSyncStore.disable()
+        }
     }
 
     fun signOut() = authRepository.signOut()
@@ -71,7 +111,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     companion object {
-        // Default region for HTTPS Cloud Functions; change if you deploy elsewhere.
         private const val FUNCTION_REGION = "us-central1"
     }
 }

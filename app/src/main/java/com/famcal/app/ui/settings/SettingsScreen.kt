@@ -1,5 +1,9 @@
 package com.famcal.app.ui.settings
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -20,10 +25,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -41,6 +51,27 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
+    var showCalendarPicker by remember { mutableStateOf(false) }
+
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        if (result.values.all { it }) {
+            viewModel.loadCalendars()
+            showCalendarPicker = true
+        }
+    }
+
+    fun startCalendarSync() {
+        if (viewModel.hasCalendarPermission()) {
+            viewModel.loadCalendars()
+            showCalendarPicker = true
+        } else {
+            calendarPermissionLauncher.launch(
+                arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR),
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -117,6 +148,35 @@ fun SettingsScreen(
                 }
             }
 
+            Section("Sync to this phone's calendar") {
+                Text(
+                    "Automatically copy family events into a calendar account on this phone " +
+                        "(your Google/Outlook account), so they appear alongside your other " +
+                        "calendars. One-way; set up once per phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Mirror events to this phone", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = state.calendarSyncEnabled,
+                        onCheckedChange = { on ->
+                            if (on) startCalendarSync() else viewModel.disableCalendarSync()
+                        },
+                    )
+                }
+                if (state.calendarSyncEnabled && state.calendarSyncName.isNotBlank()) {
+                    Text(
+                        "Syncing to: ${state.calendarSyncName}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
             OutlinedButton(
                 onClick = onManageFamilies,
                 modifier = Modifier.fillMaxWidth(),
@@ -131,6 +191,41 @@ fun SettingsScreen(
                 Text("Sign out")
             }
         }
+    }
+
+    if (showCalendarPicker) {
+        val calendars by viewModel.availableCalendars.collectAsStateWithLifecycle()
+        AlertDialog(
+            onDismissRequest = { showCalendarPicker = false },
+            title = { Text("Choose a calendar") },
+            text = {
+                Column {
+                    if (calendars.isEmpty()) {
+                        Text(
+                            "No writable calendars found on this phone. Add a Google or " +
+                                "Outlook account in Android Settings first, then try again.",
+                        )
+                    } else {
+                        calendars.forEach { calendar ->
+                            Text(
+                                text = "${calendar.displayName} (${calendar.accountName})",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.enableCalendarSync(calendar)
+                                        showCalendarPicker = false
+                                    }
+                                    .padding(vertical = 12.dp),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showCalendarPicker = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

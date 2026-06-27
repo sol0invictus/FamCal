@@ -32,6 +32,12 @@ class EventRepository @Inject constructor(
         awaitClose { registration.remove() }
     }
 
+    /** One-shot fetch of all events for a family (used by the device-calendar mirror). */
+    suspend fun getEventsOnce(familyId: String): Result<List<CalendarEvent>> = runCatching {
+        events(familyId).orderBy("startAt", Query.Direction.ASCENDING).get().await()
+            .toObjects(CalendarEvent::class.java)
+    }
+
     suspend fun getEvent(familyId: String, eventId: String): Result<CalendarEvent> = runCatching {
         events(familyId).document(eventId).get().await()
             .toObject(CalendarEvent::class.java)

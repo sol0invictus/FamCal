@@ -3,6 +3,7 @@ package com.famcal.app.ui.calendar
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.famcal.app.data.calendar.CalendarMirror
 import com.famcal.app.data.event.EventRepository
 import com.famcal.app.data.family.FamilyRepository
 import com.famcal.app.data.model.Member
@@ -33,8 +34,9 @@ data class CalendarUiState(
 class CalendarViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     familyRepository: FamilyRepository,
-    eventRepository: EventRepository,
+    private val eventRepository: EventRepository,
     private val reminderScheduler: ReminderScheduler,
+    private val calendarMirror: CalendarMirror,
 ) : ViewModel() {
 
     val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId is required" }
@@ -70,6 +72,12 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch {
             uiState.collect { state ->
                 reminderScheduler.sync(state.eventsByDay.values.flatten())
+            }
+        }
+        // Mirror raw events into the device calendar when that sync is enabled.
+        viewModelScope.launch {
+            eventRepository.observeEvents(familyId).collect { events ->
+                calendarMirror.sync(familyId, events)
             }
         }
     }
