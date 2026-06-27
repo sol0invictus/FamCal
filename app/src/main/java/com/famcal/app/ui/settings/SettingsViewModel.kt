@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.famcal.app.data.auth.AccountRepository
 import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.calendar.CalendarMirror
 import com.famcal.app.data.calendar.CalendarSyncStore
@@ -36,11 +37,15 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext context: Context,
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
+    private val accountRepository: AccountRepository,
     private val familyRepository: FamilyRepository,
     private val eventRepository: EventRepository,
     private val calendarMirror: CalendarMirror,
     private val calendarSyncStore: CalendarSyncStore,
 ) : ViewModel() {
+
+    private val _deleteError = MutableStateFlow<String?>(null)
+    val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
 
     private val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId required" }
     private val displayName = authRepository.currentUser?.displayName.orEmpty()
@@ -98,6 +103,17 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun signOut() = authRepository.signOut()
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            // On success, auth state changes and the app routes back to sign-in.
+            accountRepository.deleteAccount().onFailure { _deleteError.value = it.message }
+        }
+    }
+
+    fun clearDeleteError() {
+        _deleteError.value = null
+    }
 
     private fun feedUrl(token: String?): String? {
         if (token.isNullOrBlank() || projectId.isNullOrBlank()) return null

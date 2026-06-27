@@ -51,7 +51,9 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
+    val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
     var showCalendarPicker by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -190,7 +192,49 @@ fun SettingsScreen(
             ) {
                 Text("Sign out")
             }
+
+            TextButton(
+                onClick = { showDeleteConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Delete account", color = MaterialTheme.colorScheme.error)
+            }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete your account?") },
+            text = {
+                Text(
+                    "This permanently deletes your account and removes you from all your " +
+                        "families. This can't be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        viewModel.deleteAccount()
+                    },
+                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (deleteError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearDeleteError() },
+            title = { Text("Couldn't delete account") },
+            text = { Text(deleteError.orEmpty()) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearDeleteError() }) { Text("OK") }
+            },
+        )
     }
 
     if (showCalendarPicker) {

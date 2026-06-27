@@ -41,7 +41,11 @@ service cloud.firestore {
       // Members can update freely. A non-member may update ONLY to add themselves to
       // memberUids (joining via an invite): they weren't a member, they are now, every
       // existing member is preserved, and the list grew by exactly one.
-      allow update: if (signedIn() && request.auth.uid in resource.data.memberUids)
+      allow update: if (
+          signedIn()
+          && request.auth.uid in resource.data.memberUids
+          && request.resource.data.ownerUid == resource.data.ownerUid
+        )
         || (
           signedIn()
           && !(request.auth.uid in resource.data.memberUids)
@@ -59,9 +63,13 @@ service cloud.firestore {
         allow create, update, delete: if signedIn() && request.auth.uid == memberId;
       }
 
-      // Events (added in M2): readable/writable by any family member.
+      // Events: readable by any member; an event must be created by its author.
       match /events/{eventId} {
-        allow read, write: if signedIn() && request.auth.uid in familyMembers(familyId);
+        allow read: if signedIn() && request.auth.uid in familyMembers(familyId);
+        allow create: if signedIn()
+          && request.auth.uid in familyMembers(familyId)
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update, delete: if signedIn() && request.auth.uid in familyMembers(familyId);
       }
     }
   }

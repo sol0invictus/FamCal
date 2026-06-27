@@ -118,10 +118,17 @@ Two functions, both needing the Firebase **Blaze** plan + `firebase deploy --onl
 
 **Code-complete and verified building:** M0 skeleton, M1 auth+family, M2 calendar+events,
 M3 reminders/recurrence/settings, family management (switch/leave/join more), M4 push,
-the iCal feed, and device-calendar mirror. M1+M2 confirmed working on-device by the user;
-push + feed need the functions deployed; device mirror not yet device-tested.
+the iCal feed, device-calendar mirror, and M5 release-prep engineering (release signing,
+Crashlytics, reboot-safe reminders via WorkManager, hardened Firestore rules, in-app account
+deletion, privacy-policy draft). The signed release AAB builds via `./gradlew :app:bundleRelease`
+(signing reads gitignored `keystore.properties` → `app/upload-keystore.jks` — back these up).
+M1+M2 confirmed on-device by the user; push + feed need the functions deployed; device mirror
+not yet device-tested.
 
-**Not yet done:** M5 release prep (privacy policy — matters now since the app writes to device
-calendars and stores personal data — app signing, Play internal testing), and M6 (full
-two-way Outlook/Gmail sync via Graph/Calendar APIs, deferred due to Google verification/CASA
-cost). The README has the full roadmap and all Firebase/deploy steps.
+**Not yet done:** M5 account/listing tasks that only the owner can do (Play Console account,
+host the privacy policy, store listing, data-safety form, upload to internal testing),
+monetization (Play Billing), and M6 (full two-way Outlook/Gmail sync via Graph/Calendar APIs,
+deferred due to Google verification/CASA cost). README has the full roadmap and release steps.
+
+After changing `firestore.rules`, the owner must re-publish them (console or
+`firebase deploy --only firestore:rules`) — they are not applied by the app build.

@@ -29,8 +29,34 @@ events live in a shared cloud store and sync in real time across members' phones
 - **Calendar feed** ✅ *(code complete — needs Blaze plan + deploy)* read-only iCal feed via a Cloud Function so the calendar can be subscribed to from Google/Outlook; subscribe URL appears in Settings. (Alternative to device sync, e.g. for desktop-only accounts.)
 - **Family management** ✅ switch between families, leave a family, create/join more (Settings → Manage families).
 - **M4 — Push** ✅ *(code complete — needs Blaze + deploy)* FCM; the `notifyOnEventWrite` Cloud Function pushes to other members when an event is added/changed. Deployed together with the feed via `firebase deploy --only functions`.
-- **M5 — Release** — icon, Play listing, privacy policy, signing, internal testing track.
+- **M5 — Release prep** 🚧 *(engineering done)* release signing, Crashlytics, reboot-safe reminders, hardened security rules, in-app account deletion, privacy policy draft. Remaining is account/listing setup (below).
 - **M6 — Outlook/Gmail two-way import** — optional sync via Microsoft Graph + Google Calendar API.
+
+## Building a release
+
+Release signing reads `keystore.properties` (gitignored) which points at `app/upload-keystore.jks`.
+**Back up both files** — losing them means you can't publish updates under the same upload key.
+
+```bash
+export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"
+./gradlew :app:bundleRelease   # -> app/build/outputs/bundle/release/app-release.aab (upload this)
+```
+
+## Publishing to Google Play (the parts only you can do)
+
+1. **Re-publish the security rules** (they were tightened) — paste `firestore.rules` into the
+   Firebase console → Firestore → Rules, or `firebase deploy --only firestore:rules`.
+2. **Host the privacy policy** (`PRIVACY_POLICY.md`) at a public URL (e.g. GitHub Pages) and
+   have it reviewed.
+3. **Create a Google Play Console account** ($25 one-time) and a new app.
+4. **Store listing:** app icon, screenshots (phone), short + full description, feature graphic.
+5. **Data safety form** (declare: name, email, calendar events, push token) and **content rating**.
+6. Add the **privacy policy URL** and the in-app account-deletion path (Settings → Delete account).
+7. Upload `app-release.aab` to the **internal testing** track, add yourself as a tester, install,
+   and use it for a while before promoting to production.
+8. To actually charge for it: set up a **payments/merchant profile** and (for subscriptions/IAP)
+   integrate **Google Play Billing** — a separate piece of work.
 
 ## Add FamCal to Google Calendar / Outlook (calendar feed)
 

@@ -1,6 +1,8 @@
 *.iml
 .gradle/
 .idea/
+.kotlin/
+.claude/settings.local.json
 .DS_Store
 build/
 /captures
@@ -11,6 +13,11 @@ local.properties
 # Firebase project config — regenerate from the console (see README). Contains a
 # project-specific API key; kept out of version control to be safe.
 app/google-services.json
+
+# Release signing — NEVER commit these. Back them up securely.
+keystore.properties
+*.jks
+*.keystore
 
 # Cloud Functions
 functions/node_modules/
