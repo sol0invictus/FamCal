@@ -26,7 +26,8 @@ events live in a shared cloud store and sync in real time across members' phones
 - **M2 — Core calendar** ✅ month view (Kizitonwose), create/edit/delete events, real-time sync, per-member colors, agenda for the selected day.
 - **M3 — Polish** ✅ reminders (local notifications), recurring events (daily/weekly/monthly), settings screen.
 - **Calendar feed** ✅ *(code complete — needs Blaze plan + deploy)* read-only iCal feed via a Cloud Function so the calendar can be subscribed to from Google/Outlook; subscribe URL appears in Settings.
-- **M4 — Push** — FCM + Cloud Function notify members of changes.
+- **Family management** ✅ switch between families, leave a family, create/join more (Settings → Manage families).
+- **M4 — Push** ✅ *(code complete — needs Blaze + deploy)* FCM; the `notifyOnEventWrite` Cloud Function pushes to other members when an event is added/changed. Deployed together with the feed via `firebase deploy --only functions`.
 - **M5 — Release** — icon, Play listing, privacy policy, signing, internal testing track.
 - **M6 — Outlook/Gmail two-way import** — optional sync via Microsoft Graph + Google Calendar API.
 

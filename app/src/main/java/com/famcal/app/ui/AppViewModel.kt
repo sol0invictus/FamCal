@@ -6,6 +6,7 @@ import com.famcal.app.data.ActiveFamilyStore
 import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.family.FamilyRepository
 import com.famcal.app.data.model.Family
+import com.famcal.app.notifications.PushTokenRegistrar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Top-level app state that drives which screen the user sees. */
@@ -32,6 +34,7 @@ class AppViewModel @Inject constructor(
     authRepository: AuthRepository,
     private val familyRepository: FamilyRepository,
     private val activeFamilyStore: ActiveFamilyStore,
+    private val pushTokenRegistrar: PushTokenRegistrar,
 ) : ViewModel() {
 
     val uiState: StateFlow<AppUiState> = authRepository.authState
@@ -42,6 +45,8 @@ class AppViewModel @Inject constructor(
                 flow<AppUiState> {
                     // Make sure the user profile doc exists before we read families.
                     familyRepository.ensureUser(user)
+                    // Register this device for push (non-blocking).
+                    viewModelScope.launch { pushTokenRegistrar.register(user.uid) }
                     emitAll(
                         combine(
                             familyRepository.observeFamilies(user.uid),
