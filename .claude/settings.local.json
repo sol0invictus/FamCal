@@ -35,7 +35,16 @@
       "Bash(cp /Users/sunnyguha/projects/familycalendar/app/upload-keystore.jks /Users/sunnyguha/Documents/FamCal-keystore-backup/)",
       "Bash(cp /Users/sunnyguha/projects/familycalendar/keystore.properties /Users/sunnyguha/Documents/FamCal-keystore-backup/)",
       "Bash(cat)",
-      "Bash(chmod 600 /Users/sunnyguha/Documents/FamCal-keystore-backup/*)"
+      "Bash(chmod 600 /Users/sunnyguha/Documents/FamCal-keystore-backup/*)",
+      "Bash(grep -Ei \"google-services.json|keystore.properties|\\\\.jks$\")",
+      "Bash(gh auth *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(gh --version)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(git merge *])",
+      "Bash(grep -Ei \"google-services.json|keystore.properties|\\\\.jks$|local.properties\")"
     ]
   }
 }

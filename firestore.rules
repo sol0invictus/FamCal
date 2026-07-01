@@ -71,6 +71,15 @@ service cloud.firestore {
           && request.resource.data.createdBy == request.auth.uid;
         allow update, delete: if signedIn() && request.auth.uid in familyMembers(familyId);
       }
+
+      // Shared lists and their items: readable/writable by any family member.
+      match /lists/{listId} {
+        allow read, write: if signedIn() && request.auth.uid in familyMembers(familyId);
+
+        match /items/{itemId} {
+          allow read, write: if signedIn() && request.auth.uid in familyMembers(familyId);
+        }
+      }
     }
   }
 }

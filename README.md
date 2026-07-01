@@ -24,6 +24,7 @@ events live in a shared cloud store and sync in real time across members' phones
 - **M0 — Project skeleton** ✅ runnable Compose app, Hilt, theming, navigation, launcher icon.
 - **M1 — Auth + family** ✅ *(code complete — needs your Firebase project)* email/Google sign-in, create/join family via invite code, Firestore security rules.
 - **M2 — Core calendar** ✅ month view (Kizitonwose), create/edit/delete events, real-time sync, per-member colors, agenda for the selected day.
+- **Shared lists** ✅ groceries/to-dos/chores per family with real-time sync; bottom-nav **Calendar | Lists** home shell.
 - **M3 — Polish** ✅ reminders (local notifications), recurring events (daily/weekly/monthly), settings screen.
 - **Device calendar sync** ✅ Settings → *Sync to this phone's calendar* mirrors family events into a Google/Outlook account already on the phone (via `CalendarContract`), which the OS then syncs up. Automatic, one-way, per-device, no server. The preferred "auto-add to Google/Outlook" path.
 - **Calendar feed** ✅ *(code complete — needs Blaze plan + deploy)* read-only iCal feed via a Cloud Function so the calendar can be subscribed to from Google/Outlook; subscribe URL appears in Settings. (Alternative to device sync, e.g. for desktop-only accounts.)

@@ -6,10 +6,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.famcal.app.ui.calendar.CalendarScreen
 import com.famcal.app.ui.event.EventEditorScreen
 import com.famcal.app.ui.family.FamiliesScreen
 import com.famcal.app.ui.family.FamilySetupScreen
+import com.famcal.app.ui.home.HomeScreen
+import com.famcal.app.ui.lists.ListDetailScreen
 import com.famcal.app.ui.settings.SettingsScreen
 import java.time.ZoneId
 
@@ -24,13 +25,13 @@ fun MainNavHost(familyId: String) {
 
     NavHost(
         navController = navController,
-        startDestination = "calendar/$familyId",
+        startDestination = "home/$familyId",
     ) {
         composable(
-            route = "calendar/{familyId}",
+            route = "home/{familyId}",
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) {
-            CalendarScreen(
+            HomeScreen(
                 onAddEvent = { date ->
                     val millis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     navController.navigate("event/$familyId?dateMillis=$millis")
@@ -39,7 +40,18 @@ fun MainNavHost(familyId: String) {
                     navController.navigate("event/$familyId?eventId=$eventId")
                 },
                 onOpenSettings = { navController.navigate("settings/$familyId") },
+                onOpenList = { listId -> navController.navigate("list/$familyId/$listId") },
             )
+        }
+
+        composable(
+            route = "list/{familyId}/{listId}",
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("listId") { type = NavType.StringType },
+            ),
+        ) {
+            ListDetailScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
