@@ -25,13 +25,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
@@ -51,6 +57,8 @@ fun ListDetailScreen(
     val members by viewModel.membersByUid.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     fun submit() {
         if (input.isNotBlank()) {
@@ -85,6 +93,7 @@ fun ListDetailScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Row(
@@ -112,7 +121,18 @@ fun ListDetailScreen(
                         item = item,
                         addedByName = members[item.createdBy]?.displayName?.takeIf { it.isNotBlank() },
                         onToggle = { viewModel.toggle(item) },
-                        onDelete = { viewModel.deleteItem(item.id) },
+                        onDelete = {
+                            val deleted = item
+                            viewModel.deleteItem(deleted.id)
+                            scope.launch {
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Item deleted",
+                                    actionLabel = "Undo",
+                                    duration = SnackbarDuration.Short,
+                                )
+                                if (result == SnackbarResult.ActionPerformed) viewModel.restoreItem(deleted)
+                            }
+                        },
                     )
                 }
             }

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Button
@@ -39,6 +40,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -81,10 +86,12 @@ fun CalendarScreen(
     onAddEvent: (LocalDate) -> Unit,
     onEventClick: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<EventOccurrence?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentMonth = remember { YearMonth.now() }
     val calendarState = rememberCalendarState(
@@ -101,12 +108,16 @@ fun CalendarScreen(
             TopAppBar(
                 title = { Text(state.familyName.ifBlank { "FamCal" }) },
                 actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(Icons.Filled.Search, contentDescription = "Search events")
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { onAddEvent(state.selectedDate) }) {
                 Icon(Icons.Filled.Add, contentDescription = "Add event")
@@ -157,8 +168,17 @@ fun CalendarScreen(
                 selected = null
             },
             onDelete = {
-                viewModel.deleteEvent(occurrence.event.id)
+                val deleted = occurrence.event
+                viewModel.deleteEvent(deleted.id)
                 selected = null
+                scope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Event deleted",
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) viewModel.restoreEvent(deleted)
+                }
             },
             onDismiss = { selected = null },
         )

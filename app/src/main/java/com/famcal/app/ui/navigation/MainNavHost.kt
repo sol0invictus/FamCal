@@ -11,6 +11,7 @@ import com.famcal.app.ui.family.FamiliesScreen
 import com.famcal.app.ui.family.FamilySetupScreen
 import com.famcal.app.ui.home.HomeScreen
 import com.famcal.app.ui.lists.ListDetailScreen
+import com.famcal.app.ui.search.SearchScreen
 import com.famcal.app.ui.settings.SettingsScreen
 import java.time.ZoneId
 
@@ -40,7 +41,20 @@ fun MainNavHost(familyId: String) {
                     navController.navigate("event/$familyId?eventId=$eventId")
                 },
                 onOpenSettings = { navController.navigate("settings/$familyId") },
+                onOpenSearch = { navController.navigate("search/$familyId") },
                 onOpenList = { listId -> navController.navigate("list/$familyId/$listId") },
+            )
+        }
+
+        composable(
+            route = "search/{familyId}",
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onOpenEvent = { eventId ->
+                    navController.navigate("event/$familyId?eventId=$eventId")
+                },
             )
         }
 

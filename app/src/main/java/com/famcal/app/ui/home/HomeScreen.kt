@@ -30,6 +30,7 @@ fun HomeScreen(
     onAddEvent: (LocalDate) -> Unit,
     onEventClick: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenList: (String) -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -41,6 +42,7 @@ fun HomeScreen(
                     onAddEvent = onAddEvent,
                     onEventClick = onEventClick,
                     onOpenSettings = onOpenSettings,
+                    onOpenSearch = onOpenSearch,
                 )
                 else -> ListsScreen(onOpenList = onOpenList)
             }

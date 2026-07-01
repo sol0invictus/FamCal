@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.famcal.app.data.calendar.CalendarMirror
 import com.famcal.app.data.event.EventRepository
 import com.famcal.app.data.family.FamilyRepository
+import com.famcal.app.data.model.CalendarEvent
 import com.famcal.app.data.model.Member
 import com.famcal.app.notifications.ReminderScheduler
 import com.famcal.app.util.EventOccurrence
@@ -88,5 +89,10 @@ class CalendarViewModel @Inject constructor(
 
     fun deleteEvent(eventId: String) {
         viewModelScope.launch { eventRepository.deleteEvent(familyId, eventId) }
+    }
+
+    /** Re-creates a deleted event (for Undo). A fresh id is assigned. */
+    fun restoreEvent(event: CalendarEvent) {
+        viewModelScope.launch { eventRepository.createEvent(familyId, event.copy(id = "")) }
     }
 }

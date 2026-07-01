@@ -62,4 +62,9 @@ class ListDetailViewModel @Inject constructor(
             checked.forEach { listRepository.deleteItem(familyId, listId, it.id) }
         }
     }
+
+    /** Re-adds a deleted item (for Undo). */
+    fun restoreItem(item: ListItem) {
+        viewModelScope.launch { listRepository.addItem(familyId, listId, item.text, item.createdBy) }
+    }
 }
