@@ -27,7 +27,7 @@ class ListRepository @Inject constructor(
             .orderBy("createdAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    android.util.Log.w("FamCal", "Firestore listen failed (lists)", error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(FamilyList::class.java).orEmpty())
@@ -39,7 +39,7 @@ class ListRepository @Inject constructor(
         val registration = lists(familyId).document(listId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    android.util.Log.w("FamCal", "Firestore listen failed (lists)", error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObject(FamilyList::class.java))
@@ -52,7 +52,7 @@ class ListRepository @Inject constructor(
             .orderBy("createdAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    android.util.Log.w("FamCal", "Firestore listen failed (lists)", error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(ListItem::class.java).orEmpty())

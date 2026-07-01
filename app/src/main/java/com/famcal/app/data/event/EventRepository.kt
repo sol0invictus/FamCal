@@ -24,7 +24,7 @@ class EventRepository @Inject constructor(
             .orderBy("startAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    android.util.Log.w("FamCal", "Firestore listen failed (events)", error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(CalendarEvent::class.java).orEmpty())

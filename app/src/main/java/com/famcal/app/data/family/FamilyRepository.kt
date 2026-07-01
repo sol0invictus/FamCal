@@ -41,7 +41,7 @@ class FamilyRepository @Inject constructor(
         val registration = families.document(familyId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    android.util.Log.w("FamCal", "Firestore listen failed (family)", error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObject(Family::class.java))
@@ -54,7 +54,7 @@ class FamilyRepository @Inject constructor(
         val registration = families.document(familyId).collection(SUBCOLLECTION_MEMBERS)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    android.util.Log.w("FamCal", "Firestore listen failed (family)", error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(Member::class.java).orEmpty())
@@ -68,7 +68,7 @@ class FamilyRepository @Inject constructor(
             .whereArrayContains("memberUids", uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    android.util.Log.w("FamCal", "Firestore listen failed (family)", error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(Family::class.java).orEmpty())
