@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -45,7 +47,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -75,8 +79,10 @@ import com.kizitonwose.calendar.core.CalendarDay
 import com.kizitonwose.calendar.core.DayPosition
 import com.kizitonwose.calendar.core.daysOfWeek
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -91,6 +97,7 @@ fun CalendarScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<EventOccurrence?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentMonth = remember { YearMonth.now() }
@@ -133,6 +140,7 @@ fun CalendarScreen(
                     scope.launch { calendarState.animateScrollToMonth(YearMonth.now()) }
                     viewModel.selectDate(LocalDate.now())
                 },
+                onTitleClick = { showDatePicker = true },
             )
             MemberLegend(state)
             WeekdayHeader()
@@ -182,6 +190,31 @@ fun CalendarScreen(
             },
             onDismiss = { selected = null },
         )
+    }
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = state.selectedDate
+                .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        viewModel.selectDate(picked)
+                        scope.launch { calendarState.animateScrollToMonth(YearMonth.from(picked)) }
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            },
+        ) {
+            DatePicker(state = pickerState)
+        }
     }
 }
 
@@ -239,12 +272,24 @@ private fun memberColor(state: CalendarUiState, uid: String): Color {
     return MemberColors[index % MemberColors.size]
 }
 
+private fun agendaHeader(date: LocalDate): String {
+    val today = LocalDate.now()
+    val prefix = when (date) {
+        today -> "Today"
+        today.plusDays(1) -> "Tomorrow"
+        today.minusDays(1) -> "Yesterday"
+        else -> date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    }
+    return "$prefix  ·  ${date.formatDate()}"
+}
+
 @Composable
 private fun MonthHeader(
     month: YearMonth,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit,
+    onTitleClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 4.dp),
@@ -257,7 +302,11 @@ private fun MonthHeader(
             text = month.formatTitle(),
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onTitleClick)
+                .padding(vertical = 6.dp),
         )
         IconButton(onClick = onToday) {
             Icon(Icons.Filled.Today, contentDescription = "Jump to today")
@@ -322,40 +371,61 @@ private fun DayCell(
     val inMonth = day.position == DayPosition.MonthDate
     val isToday = day.date == LocalDate.now()
 
+    val badgeColor = when {
+        isToday -> MaterialTheme.colorScheme.primary
+        isSelected -> MaterialTheme.colorScheme.secondaryContainer
+        else -> Color.Transparent
+    }
+    val numberColor = when {
+        !inMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        isToday -> MaterialTheme.colorScheme.onPrimary
+        isSelected -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .padding(2.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-            )
             .clickable(enabled = inMonth, onClick = onClick),
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 4.dp),
         ) {
-            Text(
-                text = day.date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = when {
-                    !inMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                    isToday -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.onSurface
-                },
-            )
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(badgeColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = day.date.dayOfMonth.toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                    color = numberColor,
+                )
+            }
             if (inMonth && eventColors.isNotEmpty()) {
-                Spacer(Modifier.height(2.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    eventColors.take(4).forEach { color ->
+                Spacer(Modifier.height(3.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    eventColors.take(3).forEach { color ->
                         Box(
                             modifier = Modifier
-                                .size(5.dp)
+                                .size(6.dp)
                                 .clip(CircleShape)
                                 .background(color),
+                        )
+                    }
+                    if (eventColors.size > 3) {
+                        Text(
+                            text = "+${eventColors.size - 3}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -372,11 +442,23 @@ private fun AgendaSection(
     onOccurrenceClick: (EventOccurrence) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = date.formatDate(),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = agendaHeader(date),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            if (occurrences.isNotEmpty()) {
+                Text(
+                    text = if (occurrences.size == 1) "1 event" else "${occurrences.size} events",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         if (occurrences.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize(),
