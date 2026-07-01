@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.famcal.app.data.auth.AuthRepository
+import com.famcal.app.data.family.FamilyRepository
 import com.famcal.app.data.list.ListRepository
 import com.famcal.app.data.model.ListItem
+import com.famcal.app.data.model.Member
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +21,15 @@ class ListDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val listRepository: ListRepository,
+    familyRepository: FamilyRepository,
 ) : ViewModel() {
 
     private val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId required" }
     private val listId: String = checkNotNull(savedStateHandle["listId"]) { "listId required" }
+
+    val membersByUid: StateFlow<Map<String, Member>> = familyRepository.observeMembers(familyId)
+        .map { members -> members.associateBy { it.uid } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val listName: StateFlow<String> = listRepository.observeList(familyId, listId)
         .map { it?.name.orEmpty() }
@@ -47,5 +54,12 @@ class ListDetailViewModel @Inject constructor(
 
     fun deleteItem(itemId: String) {
         viewModelScope.launch { listRepository.deleteItem(familyId, listId, itemId) }
+    }
+
+    fun clearChecked() {
+        val checked = items.value.filter { it.checked }
+        viewModelScope.launch {
+            checked.forEach { listRepository.deleteItem(familyId, listId, it.id) }
+        }
     }
 }

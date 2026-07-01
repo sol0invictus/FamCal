@@ -15,7 +15,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,7 +48,9 @@ fun ListDetailScreen(
 ) {
     val name by viewModel.listName.collectAsStateWithLifecycle()
     val items by viewModel.items.collectAsStateWithLifecycle()
+    val members by viewModel.membersByUid.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
+    var showMenu by remember { mutableStateOf(false) }
 
     fun submit() {
         if (input.isNotBlank()) {
@@ -61,6 +66,21 @@ fun ListDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More")
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Clear checked") },
+                            enabled = items.any { it.checked },
+                            onClick = {
+                                viewModel.clearChecked()
+                                showMenu = false
+                            },
+                        )
                     }
                 },
             )
@@ -90,6 +110,7 @@ fun ListDetailScreen(
                 items(items, key = { it.id }) { item ->
                     ItemRow(
                         item = item,
+                        addedByName = members[item.createdBy]?.displayName?.takeIf { it.isNotBlank() },
                         onToggle = { viewModel.toggle(item) },
                         onDelete = { viewModel.deleteItem(item.id) },
                     )
@@ -100,23 +121,36 @@ fun ListDetailScreen(
 }
 
 @Composable
-private fun ItemRow(item: ListItem, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun ItemRow(
+    item: ListItem,
+    addedByName: String?,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(checked = item.checked, onCheckedChange = { onToggle() })
-        Text(
-            text = item.text,
-            style = MaterialTheme.typography.bodyLarge,
-            textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-            color = if (item.checked) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.bodyLarge,
+                textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
+                color = if (item.checked) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+            if (addedByName != null) {
+                Text(
+                    text = "added by $addedByName",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         IconButton(onClick = onDelete) {
             Icon(Icons.Filled.Close, contentDescription = "Delete item")
         }

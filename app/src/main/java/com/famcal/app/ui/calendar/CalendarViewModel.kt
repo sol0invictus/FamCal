@@ -85,4 +85,8 @@ class CalendarViewModel @Inject constructor(
     fun selectDate(date: LocalDate) {
         selectedDate.value = date
     }
+
+    fun deleteEvent(eventId: String) {
+        viewModelScope.launch { eventRepository.deleteEvent(familyId, eventId) }
+    }
 }

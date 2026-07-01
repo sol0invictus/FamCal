@@ -29,19 +29,25 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,6 +84,7 @@ fun CalendarScreen(
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var selected by remember { mutableStateOf<EventOccurrence?>(null) }
 
     val currentMonth = remember { YearMonth.now() }
     val calendarState = rememberCalendarState(
@@ -134,10 +141,74 @@ fun CalendarScreen(
                 date = state.selectedDate,
                 occurrences = state.selectedDayEvents,
                 colorFor = { occ -> memberColor(state, occ.event.colorUid) },
-                onEventClick = onEventClick,
+                onOccurrenceClick = { selected = it },
             )
         }
     }
+
+    selected?.let { occurrence ->
+        EventDetailSheet(
+            occurrence = occurrence,
+            assigneeName = occurrence.event.assignedTo
+                .takeIf { it.isNotBlank() }
+                ?.let { state.membersByUid[it]?.displayName },
+            onEdit = {
+                onEventClick(occurrence.event.id)
+                selected = null
+            },
+            onDelete = {
+                viewModel.deleteEvent(occurrence.event.id)
+                selected = null
+            },
+            onDismiss = { selected = null },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EventDetailSheet(
+    occurrence: EventOccurrence,
+    assigneeName: String?,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val event = occurrence.event
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
+            Text(event.title.ifBlank { "(untitled)" }, style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(8.dp))
+            DetailLine(occurrence.date.formatDate() + "  ·  " + timeLabel(occurrence))
+            if (event.location.isNotBlank()) DetailLine("📍  ${event.location}")
+            if (assigneeName != null) DetailLine("👤  For $assigneeName")
+            if (event.reminderMinutes != Reminders.NONE) DetailLine("🔔  ${Reminders.label(event.reminderMinutes)}")
+            if (event.recurrence != Recurrence.NONE) DetailLine("🔁  ${Recurrence.label(event.recurrence)}")
+            if (event.notes.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(event.notes, style = MaterialTheme.typography.bodyMedium)
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+                Button(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                    Text("Edit")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailLine(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 private fun eventColorsFor(state: CalendarUiState, date: LocalDate): List<Color> =
@@ -278,7 +349,7 @@ private fun AgendaSection(
     date: LocalDate,
     occurrences: List<EventOccurrence>,
     colorFor: (EventOccurrence) -> Color,
-    onEventClick: (String) -> Unit,
+    onOccurrenceClick: (EventOccurrence) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -311,7 +382,7 @@ private fun AgendaSection(
                     AgendaRow(
                         occurrence = occ,
                         color = colorFor(occ),
-                        onClick = { onEventClick(occ.event.id) },
+                        onClick = { onOccurrenceClick(occ) },
                     )
                 }
             }
