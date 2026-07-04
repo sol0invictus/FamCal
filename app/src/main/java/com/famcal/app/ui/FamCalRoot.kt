@@ -13,6 +13,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.famcal.app.ui.auth.AuthScreen
 import com.famcal.app.ui.family.FamilySetupScreen
 import com.famcal.app.ui.navigation.MainNavHost
+import com.famcal.app.ui.onboarding.OnboardingScreen
+import com.famcal.app.ui.onboarding.OnboardingViewModel
 
 /**
  * Chooses the top-level screen from [AppViewModel]'s state: loading splash while
@@ -24,7 +26,15 @@ fun FamCalRoot(viewModel: AppViewModel = hiltViewModel()) {
 
     when (val current = state) {
         AppUiState.Loading -> LoadingScreen()
-        AppUiState.SignedOut -> AuthScreen()
+        AppUiState.SignedOut -> {
+            val onboardingViewModel: OnboardingViewModel = hiltViewModel()
+            val seen by onboardingViewModel.seen.collectAsStateWithLifecycle()
+            if (seen) {
+                AuthScreen()
+            } else {
+                OnboardingScreen(onDone = onboardingViewModel::markSeen)
+            }
+        }
         AppUiState.NeedsFamily -> FamilySetupScreen()
         is AppUiState.Ready ->
             // Rebuild the nav graph when the active family changes so each family gets
