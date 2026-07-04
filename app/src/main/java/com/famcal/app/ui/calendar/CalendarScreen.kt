@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -63,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -150,7 +150,8 @@ fun CalendarScreen(
                     DayCell(
                         day = day,
                         isSelected = day.date == state.selectedDate,
-                        eventColors = eventColorsFor(state, day.date),
+                        dayEvents = state.eventsByDay[day.date].orEmpty()
+                            .map { it.event.title to memberColor(state, it.event.colorUid) },
                         onClick = { viewModel.selectDate(day.date) },
                     )
                 },
@@ -264,9 +265,6 @@ private fun DetailLine(text: String) {
     )
 }
 
-private fun eventColorsFor(state: CalendarUiState, date: LocalDate): List<Color> =
-    state.eventsByDay[date].orEmpty().map { memberColor(state, it.event.colorUid) }
-
 private fun memberColor(state: CalendarUiState, uid: String): Color {
     val index = state.membersByUid[uid]?.colorIndex ?: 0
     return MemberColors[index % MemberColors.size]
@@ -365,7 +363,7 @@ private fun WeekdayHeader() {
 private fun DayCell(
     day: CalendarDay,
     isSelected: Boolean,
-    eventColors: List<Color>,
+    dayEvents: List<Pair<String, Color>>,
     onClick: () -> Unit,
 ) {
     val inMonth = day.position == DayPosition.MonthDate
@@ -383,52 +381,47 @@ private fun DayCell(
         else -> MaterialTheme.colorScheme.onSurface
     }
 
-    Box(
+    Column(
         modifier = Modifier
-            .aspectRatio(1f)
-            .clickable(enabled = inMonth, onClick = onClick),
-        contentAlignment = Alignment.TopCenter,
+            .height(72.dp)
+            .fillMaxWidth()
+            .clickable(enabled = inMonth, onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 4.dp),
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(badgeColor),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .background(badgeColor),
-                contentAlignment = Alignment.Center,
-            ) {
+            Text(
+                text = day.date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                color = numberColor,
+            )
+        }
+        if (inMonth && dayEvents.isNotEmpty()) {
+            Spacer(Modifier.height(2.dp))
+            dayEvents.take(2).forEach { (title, color) ->
                 Text(
-                    text = day.date.dayOfMonth.toString(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                    color = numberColor,
+                    text = title.ifBlank { "(untitled)" },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-            if (inMonth && eventColors.isNotEmpty()) {
-                Spacer(Modifier.height(3.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    eventColors.take(3).forEach { color ->
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(color),
-                        )
-                    }
-                    if (eventColors.size > 3) {
-                        Text(
-                            text = "+${eventColors.size - 3}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+            if (dayEvents.size > 2) {
+                Text(
+                    text = "+${dayEvents.size - 2} more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -546,5 +539,9 @@ private fun AgendaRow(
 
 private fun timeLabel(occurrence: EventOccurrence): String {
     if (occurrence.event.allDay) return "All day"
+    if (occurrence.start.toLocalDate() != occurrence.end.toLocalDate()) {
+        // Multi-day: show the span rather than a confusing single-day time range.
+        return "${occurrence.start.toLocalDate().formatDate()} – ${occurrence.end.toLocalDate().formatDate()}"
+    }
     return "${occurrence.start.formatTime()} – ${occurrence.end.formatTime()}"
 }

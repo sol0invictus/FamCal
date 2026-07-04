@@ -56,10 +56,22 @@ class CalendarViewModel @Inject constructor(
             windowStart = today.minusMonths(2),
             windowEnd = today.plusMonths(12),
         )
+        // Place each occurrence on every day it spans (multi-day events show on all their days).
+        val eventsByDay = mutableMapOf<LocalDate, MutableList<EventOccurrence>>()
+        for (occ in occurrences) {
+            var day = occ.start.toLocalDate()
+            val lastDay = occ.end.toLocalDate()
+            var guard = 0
+            while (!day.isAfter(lastDay) && guard < MAX_SPAN_DAYS) {
+                eventsByDay.getOrPut(day) { mutableListOf() }.add(occ)
+                day = day.plusDays(1)
+                guard++
+            }
+        }
         CalendarUiState(
             familyName = family?.name.orEmpty(),
             membersByUid = members.associateBy { it.uid },
-            eventsByDay = occurrences.groupBy { it.date },
+            eventsByDay = eventsByDay,
             selectedDate = date,
         )
     }.stateIn(
@@ -94,5 +106,9 @@ class CalendarViewModel @Inject constructor(
     /** Re-creates a deleted event (for Undo). A fresh id is assigned. */
     fun restoreEvent(event: CalendarEvent) {
         viewModelScope.launch { eventRepository.createEvent(familyId, event.copy(id = "")) }
+    }
+
+    private companion object {
+        const val MAX_SPAN_DAYS = 62
     }
 }
