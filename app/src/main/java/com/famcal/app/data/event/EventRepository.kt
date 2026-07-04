@@ -1,6 +1,7 @@
 package com.famcal.app.data.event
 
 import com.famcal.app.data.model.CalendarEvent
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
@@ -56,4 +57,18 @@ class EventRepository @Inject constructor(
     suspend fun deleteEvent(familyId: String, eventId: String): Result<Unit> = runCatching {
         events(familyId).document(eventId).delete().await()
     }
+
+    /** Skips a single occurrence of a recurring event (delete "this event only"). */
+    suspend fun excludeDate(familyId: String, eventId: String, dateIso: String): Result<Unit> =
+        runCatching {
+            events(familyId).document(eventId)
+                .update("excludedDates", FieldValue.arrayUnion(dateIso)).await()
+        }
+
+    /** Restores a previously-skipped occurrence (undo). */
+    suspend fun includeDate(familyId: String, eventId: String, dateIso: String): Result<Unit> =
+        runCatching {
+            events(familyId).document(eventId)
+                .update("excludedDates", FieldValue.arrayRemove(dateIso)).await()
+        }
 }

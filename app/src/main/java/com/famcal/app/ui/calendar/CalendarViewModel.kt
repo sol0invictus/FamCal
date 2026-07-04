@@ -122,6 +122,19 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    /** Deletes a single occurrence of a recurring event (skips that date). */
+    fun deleteOccurrence(eventId: String, date: LocalDate) {
+        viewModelScope.launch {
+            eventRepository.excludeDate(familyId, eventId, date.toString())
+                .onFailure { _messages.emit("Couldn't remove that occurrence.") }
+        }
+    }
+
+    /** Restores a skipped occurrence (undo). */
+    fun restoreOccurrence(eventId: String, date: LocalDate) {
+        viewModelScope.launch { eventRepository.includeDate(familyId, eventId, date.toString()) }
+    }
+
     private companion object {
         const val MAX_SPAN_DAYS = 62
     }

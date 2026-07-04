@@ -51,9 +51,11 @@ object RecurrenceExpander {
                 occStart = advance(occStart, event.recurrence)
                 iterations++
             }
-            // Emit occurrences across the window.
+            // Emit occurrences across the window, skipping individually-deleted dates.
             while (!occStart.toLocalDate().isAfter(windowEnd) && iterations < MAX_ITERATIONS) {
-                result += EventOccurrence(event, occStart, occStart.plus(duration))
+                if (occStart.toLocalDate().toString() !in event.excludedDates) {
+                    result += EventOccurrence(event, occStart, occStart.plus(duration))
+                }
                 occStart = advance(occStart, event.recurrence)
                 iterations++
             }

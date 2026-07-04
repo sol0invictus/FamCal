@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -99,6 +100,7 @@ fun CalendarScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<EventOccurrence?>(null) }
+    var deleteScope by remember { mutableStateOf<EventOccurrence?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -184,19 +186,69 @@ fun CalendarScreen(
                 selected = null
             },
             onDelete = {
-                val deleted = occurrence.event
-                viewModel.deleteEvent(deleted.id)
+                val occ = occurrence
                 selected = null
-                scope.launch {
-                    val result = snackbarHostState.showSnackbar(
-                        message = "Event deleted",
-                        actionLabel = "Undo",
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) viewModel.restoreEvent(deleted)
+                if (occ.event.recurrence == Recurrence.NONE) {
+                    val deleted = occ.event
+                    viewModel.deleteEvent(deleted.id)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Event deleted",
+                            actionLabel = "Undo",
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) viewModel.restoreEvent(deleted)
+                    }
+                } else {
+                    deleteScope = occ
                 }
             },
             onDismiss = { selected = null },
+        )
+    }
+
+    deleteScope?.let { occ ->
+        val ev = occ.event
+        val date = occ.start.toLocalDate()
+        AlertDialog(
+            onDismissRequest = { deleteScope = null },
+            title = { Text("Delete repeating event") },
+            text = {
+                Text(
+                    "\"${ev.title.ifBlank { "(untitled)" }}\" repeats. Delete just this day, " +
+                        "or the whole series?",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleteScope = null
+                    viewModel.deleteOccurrence(ev.id, date)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "This event removed",
+                            actionLabel = "Undo",
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.restoreOccurrence(ev.id, date)
+                        }
+                    }
+                }) { Text("This event only") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    deleteScope = null
+                    viewModel.deleteEvent(ev.id)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Series deleted",
+                            actionLabel = "Undo",
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) viewModel.restoreEvent(ev)
+                    }
+                }) { Text("All events") }
+            },
         )
     }
 
