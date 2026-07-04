@@ -12,9 +12,12 @@ import com.famcal.app.notifications.ReminderScheduler
 import com.famcal.app.util.EventOccurrence
 import com.famcal.app.util.RecurrenceExpander
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -26,6 +29,7 @@ data class CalendarUiState(
     val membersByUid: Map<String, Member> = emptyMap(),
     val eventsByDay: Map<LocalDate, List<EventOccurrence>> = emptyMap(),
     val selectedDate: LocalDate = LocalDate.now(),
+    val isLoading: Boolean = true,
 ) {
     val selectedDayEvents: List<EventOccurrence>
         get() = eventsByDay[selectedDate].orEmpty()
@@ -43,6 +47,9 @@ class CalendarViewModel @Inject constructor(
     val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId is required" }
 
     private val selectedDate = MutableStateFlow(LocalDate.now())
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
 
     val uiState: StateFlow<CalendarUiState> = combine(
         familyRepository.observeFamily(familyId),
@@ -73,6 +80,7 @@ class CalendarViewModel @Inject constructor(
             membersByUid = members.associateBy { it.uid },
             eventsByDay = eventsByDay,
             selectedDate = date,
+            isLoading = false,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -100,12 +108,18 @@ class CalendarViewModel @Inject constructor(
     }
 
     fun deleteEvent(eventId: String) {
-        viewModelScope.launch { eventRepository.deleteEvent(familyId, eventId) }
+        viewModelScope.launch {
+            eventRepository.deleteEvent(familyId, eventId)
+                .onFailure { _messages.emit("Couldn't delete the event.") }
+        }
     }
 
     /** Re-creates a deleted event (for Undo). A fresh id is assigned. */
     fun restoreEvent(event: CalendarEvent) {
-        viewModelScope.launch { eventRepository.createEvent(familyId, event.copy(id = "")) }
+        viewModelScope.launch {
+            eventRepository.createEvent(familyId, event.copy(id = ""))
+                .onFailure { _messages.emit("Couldn't restore the event.") }
+        }
     }
 
     private companion object {

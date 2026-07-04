@@ -1,5 +1,6 @@
 package com.famcal.app.ui.lists
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +34,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,12 +56,16 @@ fun ListDetailScreen(
     viewModel: ListDetailViewModel = hiltViewModel(),
 ) {
     val name by viewModel.listName.collectAsStateWithLifecycle()
-    val items by viewModel.items.collectAsStateWithLifecycle()
+    val detail by viewModel.uiState.collectAsStateWithLifecycle()
     val members by viewModel.membersByUid.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     fun submit() {
         if (input.isNotBlank()) {
@@ -83,7 +90,7 @@ fun ListDetailScreen(
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(
                             text = { Text("Clear checked") },
-                            enabled = items.any { it.checked },
+                            enabled = detail.items.any { it.checked },
                             onClick = {
                                 viewModel.clearChecked()
                                 showMenu = false
@@ -115,8 +122,15 @@ fun ListDetailScreen(
                 }
             }
 
+            if (detail.isLoading && detail.items.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                return@Column
+            }
+
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(items, key = { it.id }) { item ->
+                items(detail.items, key = { it.id }) { item ->
                     ItemRow(
                         item = item,
                         addedByName = members[item.createdBy]?.displayName?.takeIf { it.isNotBlank() },

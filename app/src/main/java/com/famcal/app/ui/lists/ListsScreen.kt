@@ -2,6 +2,7 @@ package com.famcal.app.ui.lists
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -23,10 +25,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,56 +49,73 @@ fun ListsScreen(
     onOpenList: (String) -> Unit,
     viewModel: ListsViewModel = hiltViewModel(),
 ) {
-    val lists by viewModel.lists.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<FamilyList?>(null) }
 
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Lists") }) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { newName = ""; showAdd = true }) {
                 Icon(Icons.Filled.Add, contentDescription = "New list")
             }
         },
     ) { innerPadding ->
-        if (lists.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.FormatListBulleted,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(48.dp),
-                )
-                Text(
-                    "No lists yet. Tap + to make one — groceries, to-dos, packing…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+        when {
+            state.isLoading && state.lists.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator() }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(lists, key = { it.id }) { list ->
-                    Card(modifier = Modifier.fillMaxWidth().clickable { onOpenList(list.id) }) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = list.name.ifBlank { "(unnamed list)" },
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f).padding(vertical = 16.dp),
-                            )
-                            IconButton(onClick = { deleting = list }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete list")
+
+            state.lists.isEmpty() -> {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.FormatListBulleted,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(48.dp),
+                    )
+                    Text(
+                        "No lists yet. Tap + to make one — groceries, to-dos, packing…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.lists, key = { it.id }) { list ->
+                        Card(modifier = Modifier.fillMaxWidth().clickable { onOpenList(list.id) }) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = list.name.ifBlank { "(unnamed list)" },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f).padding(vertical = 16.dp),
+                                )
+                                IconButton(onClick = { deleting = list }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete list")
+                                }
                             }
                         }
                     }

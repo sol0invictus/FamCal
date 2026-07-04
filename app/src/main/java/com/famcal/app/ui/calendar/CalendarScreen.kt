@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +52,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,6 +101,10 @@ fun CalendarScreen(
     var selected by remember { mutableStateOf<EventOccurrence?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     val currentMonth = remember { YearMonth.now() }
     val calendarState = rememberCalendarState(
@@ -160,6 +166,7 @@ fun CalendarScreen(
             AgendaSection(
                 date = state.selectedDate,
                 occurrences = state.selectedDayEvents,
+                isLoading = state.isLoading,
                 colorFor = { occ -> memberColor(state, occ.event.colorUid) },
                 onOccurrenceClick = { selected = it },
             )
@@ -431,6 +438,7 @@ private fun DayCell(
 private fun AgendaSection(
     date: LocalDate,
     occurrences: List<EventOccurrence>,
+    isLoading: Boolean,
     colorFor: (EventOccurrence) -> Color,
     onOccurrenceClick: (EventOccurrence) -> Unit,
 ) {
@@ -452,7 +460,11 @@ private fun AgendaSection(
                 )
             }
         }
-        if (occurrences.isEmpty()) {
+        if (isLoading && occurrences.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (occurrences.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
