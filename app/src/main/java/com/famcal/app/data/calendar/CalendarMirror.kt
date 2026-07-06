@@ -13,8 +13,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -151,9 +154,30 @@ class CalendarMirror @Inject constructor(
                     put(CalendarContract.Events.DTEND, endMillis)
                 }
             }
+
+            // Exclude individually-deleted occurrences so they don't show in Google/Outlook.
+            if (recurring) buildExdate(event)?.let { put(CalendarContract.Events.EXDATE, it) }
         }
         val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
         return uri?.lastPathSegment?.toLongOrNull()
+    }
+
+    private fun buildExdate(event: CalendarEvent): String? {
+        if (event.excludedDates.isEmpty()) return null
+        return if (event.allDay) {
+            event.excludedDates.joinToString(",") { it.replace("-", "") }
+        } else {
+            val startTime = event.startAt.toDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalTime()
+            event.excludedDates.mapNotNull { iso ->
+                runCatching {
+                    val date = LocalDate.parse(iso)
+                    LocalDateTime.of(date, startTime)
+                        .atZone(ZoneId.systemDefault())
+                        .toInstant().atZone(ZoneOffset.UTC).format(EXDATE_FORMAT)
+                }.getOrNull()
+            }.joinToString(",")
+        }
     }
 
     private fun deleteEvent(deviceEventId: Long) {
@@ -172,7 +196,7 @@ class CalendarMirror @Inject constructor(
         val basis = listOf(
             event.title, event.notes, event.location,
             event.startAt.seconds, event.endAt.seconds,
-            event.allDay, event.recurrence,
+            event.allDay, event.recurrence, event.excludedDates.sorted().joinToString(","),
         ).joinToString("|")
         return basis.hashCode().toString()
     }
@@ -182,5 +206,6 @@ class CalendarMirror @Inject constructor(
 
     private companion object {
         const val DAY_MILLIS = 24L * 60 * 60 * 1000
+        val EXDATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
     }
 }

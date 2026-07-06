@@ -118,6 +118,19 @@ function buildVevent(event, familyId) {
   const rrule = toRrule(event.recurrence);
   if (rrule) lines.push(rrule);
 
+  // Exclude individually-deleted occurrences.
+  if (rrule && Array.isArray(event.excludedDates) && event.excludedDates.length) {
+    const time = formatUtc(start).split("T")[1]; // hhmmssZ
+    for (const iso of event.excludedDates) {
+      const d = String(iso).replace(/-/g, "");
+      if (event.allDay) {
+        lines.push(`EXDATE;VALUE=DATE:${d}`);
+      } else {
+        lines.push(`EXDATE:${d}T${time}`);
+      }
+    }
+  }
+
   lines.push(`SUMMARY:${escapeText(event.title || "(untitled)")}`);
   if (event.location) lines.push(`LOCATION:${escapeText(event.location)}`);
   if (event.notes) lines.push(`DESCRIPTION:${escapeText(event.notes)}`);

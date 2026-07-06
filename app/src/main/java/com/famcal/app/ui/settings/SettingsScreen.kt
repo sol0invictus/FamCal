@@ -185,6 +185,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
+                    TextButton(onClick = viewModel::syncNow) { Text("Sync now") }
                 }
             }
 

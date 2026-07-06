@@ -58,5 +58,9 @@ class AuthRepository @Inject constructor(
         requireNotNull(result.user) { "Google sign-in returned no user" }
     }
 
+    suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {
+        auth.sendPasswordResetEmail(email.trim()).await()
+    }
+
     fun signOut() = auth.signOut()
 }

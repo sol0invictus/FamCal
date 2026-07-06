@@ -100,6 +100,26 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
             )
         }
 
+        if (state.info != null) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = state.info!!,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        if (!state.isSignUp) {
+            TextButton(
+                onClick = viewModel::sendPasswordReset,
+                enabled = !state.isSubmitting,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text("Forgot password?")
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = viewModel::submit,

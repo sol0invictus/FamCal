@@ -102,6 +102,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun syncNow() {
+        viewModelScope.launch {
+            eventRepository.getEventsOnce(familyId).onSuccess { calendarMirror.sync(familyId, it) }
+        }
+    }
+
     fun renameFamily(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch { familyRepository.renameFamily(familyId, name) }
