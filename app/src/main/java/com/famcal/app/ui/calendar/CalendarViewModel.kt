@@ -3,6 +3,7 @@ package com.famcal.app.ui.calendar
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.calendar.CalendarMirror
 import com.famcal.app.data.event.EventRepository
 import com.famcal.app.data.family.FamilyRepository
@@ -39,6 +40,7 @@ data class CalendarUiState(
 class CalendarViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     familyRepository: FamilyRepository,
+    private val authRepository: AuthRepository,
     private val eventRepository: EventRepository,
     private val reminderScheduler: ReminderScheduler,
     private val calendarMirror: CalendarMirror,
@@ -114,10 +116,16 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    /** Re-creates a deleted event (for Undo). A fresh id is assigned. */
+    /**
+     * Re-creates a deleted event (for Undo). A fresh id is assigned. Firestore rules require
+     * createdBy == the current user on create, so the restorer becomes the author; the original
+     * color owner is kept via assignedTo so the event looks the same.
+     */
     fun restoreEvent(event: CalendarEvent) {
+        val uid = authRepository.currentUser?.uid ?: return
         viewModelScope.launch {
-            eventRepository.createEvent(familyId, event.copy(id = ""))
+            val restored = event.copy(id = "", createdBy = uid, assignedTo = event.colorUid)
+            eventRepository.createEvent(familyId, restored)
                 .onFailure { _messages.emit("Couldn't restore the event.") }
         }
     }
