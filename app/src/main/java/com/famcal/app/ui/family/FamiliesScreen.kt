@@ -22,10 +22,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +49,11 @@ fun FamiliesScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var leaving by remember { mutableStateOf<Family?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     Scaffold(
         topBar = {
@@ -58,6 +66,7 @@ fun FamiliesScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -94,7 +103,15 @@ fun FamiliesScreen(
         AlertDialog(
             onDismissRequest = { leaving = null },
             title = { Text("Leave \"${family.name}\"?") },
-            text = { Text("You'll stop seeing this family's calendar. You can rejoin later with its invite code.") },
+            text = {
+                Text(
+                    if (family.memberUids.size <= 1) {
+                        "You're the only member, so the family and its calendar will be deleted."
+                    } else {
+                        "You'll stop seeing this family's calendar. You can rejoin later with its invite code."
+                    },
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {

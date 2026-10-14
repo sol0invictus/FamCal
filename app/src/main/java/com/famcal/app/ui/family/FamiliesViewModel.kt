@@ -7,7 +7,10 @@ import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.family.FamilyRepository
 import com.famcal.app.data.model.Family
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -28,6 +31,9 @@ class FamiliesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val uid = authRepository.currentUser?.uid
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
 
     val uiState: StateFlow<FamiliesUiState> = combine(
         if (uid != null) familyRepository.observeFamilies(uid) else flowOf(emptyList()),
@@ -52,7 +58,7 @@ class FamiliesViewModel @Inject constructor(
                 if (activeFamilyStore.activeFamilyId.value == familyId) {
                     activeFamilyStore.setActiveFamilyId(null)
                 }
-            }
+            }.onFailure { _messages.emit("Couldn't leave the family. Please try again.") }
         }
     }
 }

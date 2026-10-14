@@ -5,7 +5,7 @@ events live in a shared cloud store and sync in real time across members' phones
 
 - **App name:** FamCal
 - **Package / applicationId:** `com.famcal.app`
-- **Min Android:** 8.0 (API 26) · **Target:** API 35
+- **Min Android:** 8.0 (API 26) · **Target:** API 36
 
 ## Tech stack
 
@@ -85,7 +85,7 @@ limitation of calendar subscriptions, not FamCal.
 
 ### 1. Install Android Studio
 Download the latest **Android Studio** (https://developer.android.com/studio) and
-install it. On first launch let it install the **Android SDK** (API 35) and create
+install it. On first launch let it install the **Android SDK** (API 36) and create
 an **emulator** (Pixel device, recent system image), or enable USB debugging on a
 physical phone.
 

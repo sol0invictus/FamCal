@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val googleAvailable = remember { viewModel.isGoogleSignInAvailable(context) }
 
     Column(
         modifier = Modifier
@@ -137,16 +139,18 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(16.dp))
+        if (googleAvailable) {
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
 
-        OutlinedButton(
-            onClick = { viewModel.signInWithGoogle(context) },
-            enabled = !state.isSubmitting,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Continue with Google")
+            OutlinedButton(
+                onClick = { viewModel.signInWithGoogle(context) },
+                enabled = !state.isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Continue with Google")
+            }
         }
 
         Spacer(Modifier.height(16.dp))

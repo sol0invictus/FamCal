@@ -37,6 +37,8 @@ data class EventFormState(
     val start: LocalDateTime = defaultStart(),
     val end: LocalDateTime = defaultStart().plusHours(1),
     val isEditing: Boolean = false,
+    /** Editing one occurrence of a recurring event; saving splits it off the series. */
+    val isSingleOccurrence: Boolean = false,
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
@@ -65,9 +67,17 @@ class EventEditorViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val eventId: String? = savedStateHandle.get<String>("eventId")?.takeIf { it.isNotBlank() }
     private val dateMillis: Long = savedStateHandle.get<Long>("dateMillis") ?: -1L
+    private val occurrenceDate: LocalDate? = savedStateHandle.get<String>("occurrenceDate")
+        ?.takeIf { it.isNotBlank() && eventId != null }
+        ?.let(LocalDate::parse)
+
+    private val currentUid: String = authRepository.currentUser?.uid.orEmpty()
 
     // Preserved across an edit so we keep the original author (and thus the event color).
-    private var createdBy: String = authRepository.currentUser?.uid.orEmpty()
+    private var createdBy: String = currentUid
+
+    // Preserved across a series edit so individually-deleted/edited days stay excluded.
+    private var excludedDates: List<String> = emptyList()
 
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<EventFormState> = _state.asStateFlow()
@@ -87,6 +97,7 @@ class EventEditorViewModel @Inject constructor(
             start = start,
             end = start.plusHours(1),
             isEditing = eventId != null,
+            isSingleOccurrence = occurrenceDate != null,
             isLoading = eventId != null,
         )
     }
@@ -96,17 +107,28 @@ class EventEditorViewModel @Inject constructor(
             eventRepository.getEvent(familyId, id)
                 .onSuccess { event ->
                     createdBy = event.createdBy
+                    excludedDates = event.excludedDates
+                    var start = event.startAt.toLocalDateTime()
+                    var end = event.endAt.toLocalDateTime()
+                    if (occurrenceDate != null) {
+                        // Show this occurrence's own date, keeping the series' time and length.
+                        val duration = java.time.Duration.between(start, end)
+                        start = occurrenceDate.atTime(start.toLocalTime())
+                        end = start.plus(duration)
+                    }
                     _state.update {
                         it.copy(
                             title = event.title,
                             location = event.location,
                             notes = event.notes,
                             allDay = event.allDay,
-                            assignedTo = event.assignedTo,
+                            // A split-off occurrence keeps the series' color via assignedTo,
+                            // since its author becomes the current user.
+                            assignedTo = if (occurrenceDate != null) event.colorUid else event.assignedTo,
                             reminderMinutes = event.reminderMinutes,
-                            recurrence = event.recurrence,
-                            start = event.startAt.toLocalDateTime(),
-                            end = event.endAt.toLocalDateTime(),
+                            recurrence = if (occurrenceDate != null) Recurrence.NONE else event.recurrence,
+                            start = start,
+                            end = end,
                             isLoading = false,
                         )
                     }
@@ -148,22 +170,26 @@ class EventEditorViewModel @Inject constructor(
         _state.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
             val event = CalendarEvent(
-                id = eventId.orEmpty(),
+                id = if (occurrenceDate != null) "" else eventId.orEmpty(),
                 title = current.title.trim(),
                 notes = current.notes.trim(),
                 location = current.location.trim(),
                 startAt = current.start.toTimestamp(),
                 endAt = current.end.toTimestamp(),
                 allDay = current.allDay,
-                createdBy = createdBy,
+                // Firestore rules require new events to be authored by the current user.
+                createdBy = if (occurrenceDate != null) currentUid else createdBy,
                 assignedTo = current.assignedTo,
                 reminderMinutes = current.reminderMinutes,
                 recurrence = current.recurrence,
+                excludedDates = if (occurrenceDate != null) emptyList() else excludedDates,
             )
-            val result = if (eventId == null) {
-                eventRepository.createEvent(familyId, event)
-            } else {
-                eventRepository.updateEvent(familyId, event)
+            val result = when {
+                eventId == null -> eventRepository.createEvent(familyId, event)
+                occurrenceDate != null -> eventRepository.detachOccurrence(
+                    familyId, eventId, occurrenceDate.toString(), event,
+                )
+                else -> eventRepository.updateEvent(familyId, event)
             }
             result
                 .onSuccess { onDone() }
@@ -175,7 +201,12 @@ class EventEditorViewModel @Inject constructor(
         val id = eventId ?: return
         _state.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
-            eventRepository.deleteEvent(familyId, id)
+            val result = if (occurrenceDate != null) {
+                eventRepository.excludeDate(familyId, id, occurrenceDate.toString())
+            } else {
+                eventRepository.deleteEvent(familyId, id)
+            }
+            result
                 .onSuccess { onDone() }
                 .onFailure { e -> _state.update { it.copy(isSaving = false, error = e.message) } }
         }

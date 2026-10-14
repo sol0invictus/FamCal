@@ -1,6 +1,6 @@
 # FamCal Privacy Policy
 
-_Last updated: 2026-06-27_
+_Last updated: 2026-10-14_
 
 > **Note:** This is a starting-point template, not legal advice. Have it reviewed by a
 > qualified professional before publishing a paid app, and host it at a public URL to link
@@ -13,7 +13,7 @@ why, and your choices.
 - **Account information:** your name and email address, provided when you sign up (via email
   or Google sign-in).
 - **Calendar content:** events you create — titles, notes, locations, dates/times, reminders,
-  and recurrence — and the families and members you belong to.
+  and recurrence — shared lists and list items, and the families and members you belong to.
 - **Device push token:** an identifier used to send you notifications about changes your
   family members make.
 - **Diagnostics:** crash reports and basic diagnostic data (via Firebase Crashlytics) to help
@@ -43,9 +43,25 @@ If you subscribe to your family's calendar feed from Google Calendar or Outlook,
 that private feed URL can view the family's events. Treat the URL as a secret.
 
 ## Data retention and deletion
-Your data is kept while your account exists. You can **delete your account and associated data
-at any time** in the app: **Settings → Delete account**. This removes your profile and your
-membership in all families. For help, contact us at the address below.
+Your data is kept while your account exists. You can delete your account at any time, as
+described below.
+
+## Deleting your account
+You can request deletion of your FamCal account and associated data in either of two ways:
+
+1. **In the app:** open **Settings → Delete account** and confirm.
+2. **Without the app:** email **eosaten@gmail.com** from the address you signed up with, with
+   the subject "Delete my FamCal account". We will delete your account within 30 days and
+   confirm by email.
+
+**What is deleted:** your sign-in account, your profile (name, email, push tokens), and your
+membership in every family. If you were the last member of a family, that family and all of
+its events and lists are deleted too.
+
+**What is kept:** events and list items you added to a family that still has other members
+stay in that family's shared calendar, because they belong to the family. A family member can
+delete them, or you can delete them yourself before deleting your account. Crash reports are
+kept by Firebase Crashlytics for up to 90 days and are not linked to your name or email.
 
 ## Children
 FamCal is intended for general audiences and is not directed to children under 13. Do not

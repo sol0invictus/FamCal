@@ -94,7 +94,9 @@ class CalendarViewModel @Inject constructor(
         // Keep upcoming reminders scheduled as events change.
         viewModelScope.launch {
             uiState.collect { state ->
-                reminderScheduler.sync(state.eventsByDay.values.flatten())
+                if (!state.isLoading) {
+                    reminderScheduler.sync(familyId, state.eventsByDay.values.flatten())
+                }
             }
         }
         // Mirror raw events into the device calendar when that sync is enabled.

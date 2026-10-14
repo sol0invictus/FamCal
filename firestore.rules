@@ -38,13 +38,21 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.auth.uid in request.resource.data.memberUids;
 
-      // Members can update freely. A non-member may update ONLY to add themselves to
-      // memberUids (joining via an invite): they weren't a member, they are now, every
-      // existing member is preserved, and the list grew by exactly one.
+      // Members can update freely, but only the owner can change ownerUid, and only to
+      // another member (handing over ownership when leaving). A non-member may update
+      // ONLY to add themselves to memberUids (joining via an invite): they weren't a
+      // member, they are now, every existing member is preserved, and the list grew by
+      // exactly one.
       allow update: if (
           signedIn()
           && request.auth.uid in resource.data.memberUids
-          && request.resource.data.ownerUid == resource.data.ownerUid
+          && (
+            request.resource.data.ownerUid == resource.data.ownerUid
+            || (
+              resource.data.ownerUid == request.auth.uid
+              && request.resource.data.ownerUid in request.resource.data.memberUids
+            )
+          )
         )
         || (
           signedIn()

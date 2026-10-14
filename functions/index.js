@@ -41,13 +41,15 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
   res.status(200).send(ics);
 });
 
-// Notifies the other family members when an event is created or updated.
+// Tells family members' devices when an event is created, updated, or deleted.
+// Messages are data-only so the app handles them even in the background: it shows a
+// notification (creates/updates, not to the person who made the change) and refreshes
+// its local reminder alarms (all changes, including deletes).
 exports.notifyOnEventWrite = onDocumentWritten(
   "families/{familyId}/events/{eventId}",
   async (event) => {
     const after = event.data && event.data.after && event.data.after.data();
     const before = event.data && event.data.before && event.data.before.data();
-    if (!after) return; // deletion — nothing to notify
 
     const familyId = event.params.familyId;
     const db = admin.firestore();
@@ -55,26 +57,35 @@ exports.notifyOnEventWrite = onDocumentWritten(
     if (!familySnap.exists) return;
 
     const memberUids = familySnap.get("memberUids") || [];
-    const actor = after.createdBy;
-    const recipients = memberUids.filter((uid) => uid !== actor);
-    if (recipients.length === 0) return;
+    // Who made the change; deletes carry no author, so everyone gets a silent refresh.
+    const actor = after ? after.updatedBy || after.createdBy : null;
 
-    const tokens = [];
-    for (const uid of recipients) {
+    const tokensByUid = {};
+    for (const uid of memberUids) {
       const userSnap = await db.collection("users").doc(uid).get();
       const userTokens = userSnap.get("fcmTokens");
-      if (Array.isArray(userTokens)) tokens.push(...userTokens);
+      if (Array.isArray(userTokens) && userTokens.length) tokensByUid[uid] = userTokens;
     }
-    if (tokens.length === 0) return;
 
-    const title = before ? "Event updated" : "New event";
-    const body = `${after.title || "(untitled)"} · ${familySnap.get("name") || "Family"}`;
-
-    await admin.messaging().sendEachForMulticast({
-      tokens,
-      notification: { title, body },
-      data: { familyId },
-    });
+    const familyName = familySnap.get("name") || "Family";
+    const sends = [];
+    for (const [uid, tokens] of Object.entries(tokensByUid)) {
+      const data = { familyId };
+      if (after && uid !== actor) {
+        data.title = before ? "Event updated" : "New event";
+        data.body = `${after.title || "(untitled)"} · ${familyName}`;
+      } else if (after) {
+        continue; // the person who made the change already has it scheduled locally
+      }
+      sends.push(
+        admin.messaging().sendEachForMulticast({
+          tokens,
+          data,
+          android: { priority: data.title ? "high" : "normal" },
+        })
+      );
+    }
+    await Promise.all(sends);
   }
 );
 

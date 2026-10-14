@@ -1,6 +1,7 @@
 package com.famcal.app.data.event
 
 import com.famcal.app.data.model.CalendarEvent
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -15,7 +16,10 @@ import javax.inject.Singleton
 @Singleton
 class EventRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
+    private val auth: FirebaseAuth,
 ) {
+    private val currentUid: String get() = auth.currentUser?.uid.orEmpty()
+
     private fun events(familyId: String) =
         firestore.collection("families").document(familyId).collection("events")
 
@@ -46,12 +50,12 @@ class EventRepository @Inject constructor(
     }
 
     suspend fun createEvent(familyId: String, event: CalendarEvent): Result<Unit> = runCatching {
-        events(familyId).add(event).await()
+        events(familyId).add(event.copy(updatedBy = currentUid)).await()
     }
 
     suspend fun updateEvent(familyId: String, event: CalendarEvent): Result<Unit> = runCatching {
         require(event.id.isNotBlank()) { "Cannot update an event without an id" }
-        events(familyId).document(event.id).set(event).await()
+        events(familyId).document(event.id).set(event.copy(updatedBy = currentUid)).await()
     }
 
     suspend fun deleteEvent(familyId: String, eventId: String): Result<Unit> = runCatching {
@@ -62,13 +66,39 @@ class EventRepository @Inject constructor(
     suspend fun excludeDate(familyId: String, eventId: String, dateIso: String): Result<Unit> =
         runCatching {
             events(familyId).document(eventId)
-                .update("excludedDates", FieldValue.arrayUnion(dateIso)).await()
+                .update(
+                    mapOf("excludedDates" to FieldValue.arrayUnion(dateIso), "updatedBy" to currentUid),
+                ).await()
         }
+
+    /**
+     * Edits a single occurrence of a recurring event ("this event only"): skips [dateIso] in
+     * the series and saves [replacement] as a standalone event, atomically.
+     */
+    suspend fun detachOccurrence(
+        familyId: String,
+        seriesId: String,
+        dateIso: String,
+        replacement: CalendarEvent,
+    ): Result<Unit> = runCatching {
+        firestore.runBatch { batch ->
+            batch.set(events(familyId).document(), replacement.copy(updatedBy = currentUid))
+            batch.update(
+                events(familyId).document(seriesId),
+                mapOf(
+                    "excludedDates" to FieldValue.arrayUnion(dateIso),
+                    "updatedBy" to currentUid,
+                ),
+            )
+        }.await()
+    }
 
     /** Restores a previously-skipped occurrence (undo). */
     suspend fun includeDate(familyId: String, eventId: String, dateIso: String): Result<Unit> =
         runCatching {
             events(familyId).document(eventId)
-                .update("excludedDates", FieldValue.arrayRemove(dateIso)).await()
+                .update(
+                    mapOf("excludedDates" to FieldValue.arrayRemove(dateIso), "updatedBy" to currentUid),
+                ).await()
         }
 }

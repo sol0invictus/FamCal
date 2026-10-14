@@ -37,8 +37,9 @@ fun MainNavHost(familyId: String) {
                     val millis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     navController.navigate("event/$familyId?dateMillis=$millis")
                 },
-                onEventClick = { eventId ->
-                    navController.navigate("event/$familyId?eventId=$eventId")
+                onEventClick = { eventId, occurrenceDate ->
+                    val occurrence = occurrenceDate?.let { "&occurrenceDate=$it" }.orEmpty()
+                    navController.navigate("event/$familyId?eventId=$eventId$occurrence")
                 },
                 onOpenSettings = { navController.navigate("settings/$familyId") },
                 onOpenSearch = { navController.navigate("search/$familyId") },
@@ -90,11 +91,14 @@ fun MainNavHost(familyId: String) {
         }
 
         composable(
-            route = "event/{familyId}?eventId={eventId}&dateMillis={dateMillis}",
+            route = "event/{familyId}?eventId={eventId}&dateMillis={dateMillis}" +
+                "&occurrenceDate={occurrenceDate}",
             arguments = listOf(
                 navArgument("familyId") { type = NavType.StringType },
                 navArgument("eventId") { type = NavType.StringType; defaultValue = "" },
                 navArgument("dateMillis") { type = NavType.LongType; defaultValue = -1L },
+                // ISO date of one occurrence of a recurring event to edit on its own.
+                navArgument("occurrenceDate") { type = NavType.StringType; defaultValue = "" },
             ),
         ) {
             EventEditorScreen(onClose = { navController.popBackStack() })

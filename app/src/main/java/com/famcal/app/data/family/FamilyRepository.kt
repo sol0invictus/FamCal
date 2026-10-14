@@ -3,6 +3,7 @@ package com.famcal.app.data.family
 import com.famcal.app.data.model.Family
 import com.famcal.app.data.model.Member
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -74,6 +75,11 @@ class FamilyRepository @Inject constructor(
                 trySend(snapshot?.toObjects(Family::class.java).orEmpty())
             }
         awaitClose { registration.remove() }
+    }
+
+    /** One-shot fetch of the families the user belongs to (for background work). */
+    suspend fun getFamiliesOnce(uid: String): Result<List<Family>> = runCatching {
+        families.whereArrayContains("memberUids", uid).get().await().toObjects(Family::class.java)
     }
 
     suspend fun createFamily(name: String, user: FirebaseUser): Result<Family> = runCatching {
@@ -155,11 +161,39 @@ class FamilyRepository @Inject constructor(
         families.document(familyId).update("name", name.trim()).await()
     }
 
-    /** Removes the current user from a family (and their member doc + familyIds entry). */
+    /**
+     * Removes the current user from a family (and their member doc + familyIds entry).
+     * If the owner leaves, ownership passes to the longest-standing remaining member;
+     * if the owner is the last member, the family, its events/lists and its invite code are
+     * deleted.
+     */
     suspend fun leaveFamily(familyId: String, user: FirebaseUser): Result<Unit> = runCatching {
         val ref = families.document(familyId)
+        val family = ref.get().await().toObject(Family::class.java) ?: error("Family not found")
+        val remaining = family.memberUids - user.uid
+        val isOwner = family.ownerUid == user.uid
+        val invite = family.inviteCode.takeIf { it.isNotBlank() }?.let { invites.document(it) }
+        // Subcollections must go first: their rules check membership via the family doc.
+        if (isOwner && remaining.isEmpty()) deleteFamilyContents(ref)
         firestore.runBatch { batch ->
-            batch.update(ref, "memberUids", FieldValue.arrayRemove(user.uid))
+            when {
+                isOwner && remaining.isEmpty() -> {
+                    batch.delete(ref)
+                    invite?.let { batch.delete(it) }
+                }
+                isOwner -> {
+                    val newOwner = remaining.first()
+                    batch.update(
+                        ref,
+                        mapOf(
+                            "memberUids" to FieldValue.arrayRemove(user.uid),
+                            "ownerUid" to newOwner,
+                        ),
+                    )
+                    invite?.let { batch.update(it, "ownerUid", newOwner) }
+                }
+                else -> batch.update(ref, "memberUids", FieldValue.arrayRemove(user.uid))
+            }
             batch.delete(ref.collection(SUBCOLLECTION_MEMBERS).document(user.uid))
             batch.set(
                 users.document(user.uid),
@@ -167,6 +201,20 @@ class FamilyRepository @Inject constructor(
                 SetOptions.merge(),
             )
         }.await()
+    }
+
+    private suspend fun deleteFamilyContents(ref: DocumentReference) {
+        val docs = mutableListOf<DocumentReference>()
+        docs += ref.collection(SUBCOLLECTION_EVENTS).get().await().documents.map { it.reference }
+        val lists = ref.collection(SUBCOLLECTION_LISTS).get().await().documents
+        for (list in lists) {
+            docs += list.reference.collection(SUBCOLLECTION_ITEMS).get().await().documents.map { it.reference }
+        }
+        docs += lists.map { it.reference }
+        // Firestore batches are capped at 500 writes.
+        for (chunk in docs.chunked(MAX_BATCH_WRITES)) {
+            firestore.runBatch { batch -> chunk.forEach { batch.delete(it) } }.await()
+        }
     }
 
     /** Ensures the family has a feed token for the iCal subscription URL; creates one if missing. */
@@ -189,6 +237,10 @@ class FamilyRepository @Inject constructor(
         private const val COLLECTION_USERS = "users"
         private const val COLLECTION_INVITES = "invites"
         private const val SUBCOLLECTION_MEMBERS = "members"
+        private const val SUBCOLLECTION_EVENTS = "events"
+        private const val SUBCOLLECTION_LISTS = "lists"
+        private const val SUBCOLLECTION_ITEMS = "items"
+        private const val MAX_BATCH_WRITES = 450
         private const val INVITE_CODE_LENGTH = 6
         // Omit easily-confused characters (0/O, 1/I) for codes people read aloud.
         private const val INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

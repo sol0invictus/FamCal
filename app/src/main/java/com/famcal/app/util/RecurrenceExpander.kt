@@ -17,8 +17,8 @@ data class EventOccurrence(
 
 /**
  * Expands events (including recurring ones) into concrete [EventOccurrence]s that fall
- * within a date window. Recurrence is series-wide with no per-instance exceptions —
- * good enough for an MVP family calendar.
+ * within a date window. Individually deleted or edited days are skipped via
+ * [CalendarEvent.excludedDates] (an edited day lives on as its own standalone event).
  */
 object RecurrenceExpander {
 

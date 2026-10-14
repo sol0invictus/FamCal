@@ -69,7 +69,15 @@ fun EventEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isEditing) "Edit event" else "New event") },
+                title = {
+                    Text(
+                        when {
+                            state.isSingleOccurrence -> "Edit this event"
+                            state.isEditing -> "Edit event"
+                            else -> "New event"
+                        },
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
@@ -142,13 +150,16 @@ fun EventEditorScreen(
                 selected = state.reminderMinutes,
                 onSelect = viewModel::onReminderChange,
             )
-            OptionSelector(
-                label = "Repeat",
-                options = Recurrence.all,
-                optionLabel = Recurrence::label,
-                selected = state.recurrence,
-                onSelect = viewModel::onRecurrenceChange,
-            )
+            // A single occurrence split off a series doesn't repeat on its own.
+            if (!state.isSingleOccurrence) {
+                OptionSelector(
+                    label = "Repeat",
+                    options = Recurrence.all,
+                    optionLabel = Recurrence::label,
+                    selected = state.recurrence,
+                    onSelect = viewModel::onRecurrenceChange,
+                )
+            }
 
             OutlinedTextField(
                 value = state.location,
@@ -179,7 +190,10 @@ fun EventEditorScreen(
                     enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Delete event", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        if (state.isSingleOccurrence) "Delete this event" else "Delete event",
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         }

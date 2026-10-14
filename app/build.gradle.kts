@@ -19,12 +19,12 @@ val hasReleaseSigning = keystorePropertiesFile.exists()
 
 android {
     namespace = "com.famcal.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.famcal.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
 

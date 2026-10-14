@@ -70,6 +70,9 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /** Google sign-in only works once a web client ID is configured in Firebase. */
+    fun isGoogleSignInAvailable(context: Context): Boolean = googleSignInClient.isConfigured(context)
+
     fun signInWithGoogle(context: Context) {
         _state.update { it.copy(isSubmitting = true, error = null, info = null) }
         viewModelScope.launch {

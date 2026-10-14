@@ -26,6 +26,8 @@ data class CalendarEvent(
     val recurrence: String = Recurrence.NONE,
     /** ISO dates ("yyyy-MM-dd") of recurring occurrences to skip (deleted individually). */
     val excludedDates: List<String> = emptyList(),
+    /** uid of whoever last wrote the event; push notifications skip this person. */
+    val updatedBy: String = "",
     @ServerTimestamp val updatedAt: Date? = null,
 ) {
     /** Which member's color represents this event. */

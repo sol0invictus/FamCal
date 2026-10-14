@@ -10,7 +10,9 @@ import com.google.firebase.messaging.RemoteMessage
 
 /**
  * Receives FCM messages (sent by the `notifyOnEventWrite` Cloud Function when a family
- * member adds or changes an event) and keeps the user's FCM token stored in Firestore.
+ * member adds, changes, or deletes an event) and keeps the user's FCM token stored in
+ * Firestore. Messages are data-only so this runs even when the app is in the background:
+ * it posts the notification (if the message has one) and refreshes reminder alarms.
  */
 class FamcalMessagingService : FirebaseMessagingService() {
 
@@ -21,14 +23,16 @@ class FamcalMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title ?: message.data["title"] ?: "FamCal"
-        val body = message.notification?.body ?: message.data["body"].orEmpty()
-        postNotification(
-            context = this,
-            channelId = CHANNEL_UPDATES,
-            id = System.currentTimeMillis().toInt(),
-            title = title,
-            text = body,
-        )
+        val title = message.notification?.title ?: message.data["title"]
+        if (title != null) {
+            postNotification(
+                context = this,
+                channelId = CHANNEL_UPDATES,
+                id = System.currentTimeMillis().toInt(),
+                title = title,
+                text = message.notification?.body ?: message.data["body"].orEmpty(),
+            )
+        }
+        ReminderRescheduleWorker.refreshNow(this)
     }
 }

@@ -93,7 +93,7 @@ import java.util.Locale
 @Composable
 fun CalendarScreen(
     onAddEvent: (LocalDate) -> Unit,
-    onEventClick: (String) -> Unit,
+    onEventClick: (eventId: String, occurrenceDate: LocalDate?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     viewModel: CalendarViewModel = hiltViewModel(),
@@ -101,6 +101,7 @@ fun CalendarScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<EventOccurrence?>(null) }
     var deleteScope by remember { mutableStateOf<EventOccurrence?>(null) }
+    var editScope by remember { mutableStateOf<EventOccurrence?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -182,7 +183,11 @@ fun CalendarScreen(
                 .takeIf { it.isNotBlank() }
                 ?.let { state.membersByUid[it]?.displayName },
             onEdit = {
-                onEventClick(occurrence.event.id)
+                if (occurrence.event.recurrence == Recurrence.NONE) {
+                    onEventClick(occurrence.event.id, null)
+                } else {
+                    editScope = occurrence
+                }
                 selected = null
             },
             onDelete = {
@@ -204,6 +209,32 @@ fun CalendarScreen(
                 }
             },
             onDismiss = { selected = null },
+        )
+    }
+
+    editScope?.let { occ ->
+        val ev = occ.event
+        AlertDialog(
+            onDismissRequest = { editScope = null },
+            title = { Text("Edit repeating event") },
+            text = {
+                Text(
+                    "\"${ev.title.ifBlank { "(untitled)" }}\" repeats. Change just this day, " +
+                        "or the whole series?",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    editScope = null
+                    onEventClick(ev.id, occ.start.toLocalDate())
+                }) { Text("This event only") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    editScope = null
+                    onEventClick(ev.id, null)
+                }) { Text("All events") }
+            },
         )
     }
 

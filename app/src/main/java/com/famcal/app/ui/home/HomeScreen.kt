@@ -28,7 +28,8 @@ import java.time.LocalDate
 @Composable
 fun HomeScreen(
     onAddEvent: (LocalDate) -> Unit,
-    onEventClick: (String) -> Unit,
+    /** Opens the editor; a non-null date edits just that occurrence of a recurring event. */
+    onEventClick: (eventId: String, occurrenceDate: LocalDate?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenList: (String) -> Unit,
