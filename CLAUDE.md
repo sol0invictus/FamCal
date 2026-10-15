@@ -49,7 +49,10 @@ from `SavedStateHandle` — that's how view models get the active family. The ev
 carries optional `eventId` (edit vs. create) and `dateMillis` (default date for a new event).
 
 **Data layer = repositories wrapping Firestore, exposing `Flow`s via `callbackFlow` +
-snapshot listeners.** This gives real-time cross-device sync for free. Suspend writes use
+snapshot listeners.** This gives real-time cross-device sync for free. Every listener flow
+ends in `retryListen(label)` (`data/FirestoreFlows.kt`): Firestore kills a listener on error,
+and right after creating/joining a family the local cache can route the UI there before the
+server commits, so transient PERMISSION_DENIED is retried with backoff. Suspend writes use
 `kotlinx-coroutines-play-services` `await()`. Repositories: `AuthRepository`,
 `FamilyRepository` (families, members, user docs, invites, feed token), `EventRepository`
 (events). `FirebaseModule` (Hilt) provides the `FirebaseAuth`/`FirebaseFirestore` singletons.

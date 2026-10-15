@@ -2,6 +2,7 @@ package com.famcal.app.data.family
 
 import com.famcal.app.data.model.Family
 import com.famcal.app.data.model.Member
+import com.famcal.app.data.retryListen
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
@@ -42,26 +43,26 @@ class FamilyRepository @Inject constructor(
         val registration = families.document(familyId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.w("FamCal", "Firestore listen failed (family)", error)
+                    close(error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObject(Family::class.java))
             }
         awaitClose { registration.remove() }
-    }
+    }.retryListen("family")
 
     /** Streams the members of a family, updating live. */
     fun observeMembers(familyId: String): Flow<List<Member>> = callbackFlow {
         val registration = families.document(familyId).collection(SUBCOLLECTION_MEMBERS)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.w("FamCal", "Firestore listen failed (family)", error)
+                    close(error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(Member::class.java).orEmpty())
             }
         awaitClose { registration.remove() }
-    }
+    }.retryListen("family")
 
     /** Streams the families the user belongs to, updating live as they change. */
     fun observeFamilies(uid: String): Flow<List<Family>> = callbackFlow {
@@ -69,13 +70,13 @@ class FamilyRepository @Inject constructor(
             .whereArrayContains("memberUids", uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.w("FamCal", "Firestore listen failed (family)", error)
+                    close(error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(Family::class.java).orEmpty())
             }
         awaitClose { registration.remove() }
-    }
+    }.retryListen("family")
 
     /** One-shot fetch of the families the user belongs to (for background work). */
     suspend fun getFamiliesOnce(uid: String): Result<List<Family>> = runCatching {

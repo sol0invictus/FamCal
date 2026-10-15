@@ -2,6 +2,7 @@ package com.famcal.app.data.list
 
 import com.famcal.app.data.model.FamilyList
 import com.famcal.app.data.model.ListItem
+import com.famcal.app.data.retryListen
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
@@ -27,38 +28,38 @@ class ListRepository @Inject constructor(
             .orderBy("createdAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.w("FamCal", "Firestore listen failed (lists)", error)
+                    close(error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(FamilyList::class.java).orEmpty())
             }
         awaitClose { registration.remove() }
-    }
+    }.retryListen("lists")
 
     fun observeList(familyId: String, listId: String): Flow<FamilyList?> = callbackFlow {
         val registration = lists(familyId).document(listId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.w("FamCal", "Firestore listen failed (lists)", error)
+                    close(error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObject(FamilyList::class.java))
             }
         awaitClose { registration.remove() }
-    }
+    }.retryListen("lists")
 
     fun observeItems(familyId: String, listId: String): Flow<List<ListItem>> = callbackFlow {
         val registration = items(familyId, listId)
             .orderBy("createdAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.w("FamCal", "Firestore listen failed (lists)", error)
+                    close(error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(ListItem::class.java).orEmpty())
             }
         awaitClose { registration.remove() }
-    }
+    }.retryListen("lists")
 
     suspend fun createList(familyId: String, name: String, uid: String): Result<Unit> = runCatching {
         lists(familyId).add(FamilyList(name = name.trim(), createdBy = uid)).await()

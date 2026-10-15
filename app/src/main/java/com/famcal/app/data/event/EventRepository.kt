@@ -1,6 +1,7 @@
 package com.famcal.app.data.event
 
 import com.famcal.app.data.model.CalendarEvent
+import com.famcal.app.data.retryListen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -29,13 +30,13 @@ class EventRepository @Inject constructor(
             .orderBy("startAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.w("FamCal", "Firestore listen failed (events)", error)
+                    close(error)
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.toObjects(CalendarEvent::class.java).orEmpty())
             }
         awaitClose { registration.remove() }
-    }
+    }.retryListen("events")
 
     /** One-shot fetch of all events for a family (used by the device-calendar mirror). */
     suspend fun getEventsOnce(familyId: String): Result<List<CalendarEvent>> = runCatching {
