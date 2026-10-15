@@ -126,7 +126,7 @@ class CalendarMirror @Inject constructor(
             put(CalendarContract.Events.EVENT_LOCATION, event.location)
 
             val recurring = event.recurrence != Recurrence.NONE
-            val rrule = toRrule(event.recurrence)
+            val rrule = toRrule(event)
 
             if (event.allDay) {
                 val startUtc = event.startAt.toDate().toInstant()
@@ -185,18 +185,30 @@ class CalendarMirror @Inject constructor(
         context.contentResolver.delete(uri, null, null)
     }
 
-    private fun toRrule(recurrence: String): String? = when (recurrence) {
-        Recurrence.DAILY -> "FREQ=DAILY"
-        Recurrence.WEEKLY -> "FREQ=WEEKLY"
-        Recurrence.MONTHLY -> "FREQ=MONTHLY"
-        else -> null
+    private fun toRrule(event: CalendarEvent): String? {
+        val freq = when (event.recurrence) {
+            Recurrence.DAILY -> "FREQ=DAILY"
+            Recurrence.WEEKLY -> "FREQ=WEEKLY"
+            Recurrence.MONTHLY -> "FREQ=MONTHLY"
+            Recurrence.YEARLY -> "FREQ=YEARLY"
+            else -> return null
+        }
+        val until = event.repeatUntil ?: return freq
+        // All-day series use a DATE; timed series need UNTIL as a UTC date-time.
+        val untilValue = if (event.allDay) {
+            until.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate().format(UNTIL_DATE_FORMAT)
+        } else {
+            until.toDate().toInstant().atZone(ZoneOffset.UTC).format(EXDATE_FORMAT)
+        }
+        return "$freq;UNTIL=$untilValue"
     }
 
     private fun contentHash(event: CalendarEvent): String {
         val basis = listOf(
             event.title, event.notes, event.location,
             event.startAt.seconds, event.endAt.seconds,
-            event.allDay, event.recurrence, event.excludedDates.sorted().joinToString(","),
+            event.allDay, event.recurrence, event.repeatUntil?.seconds,
+            event.excludedDates.sorted().joinToString(","),
         ).joinToString("|")
         return basis.hashCode().toString()
     }
@@ -207,5 +219,6 @@ class CalendarMirror @Inject constructor(
     private companion object {
         const val DAY_MILLIS = 24L * 60 * 60 * 1000
         val EXDATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
+        val UNTIL_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
     }
 }

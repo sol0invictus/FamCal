@@ -6,13 +6,15 @@ object Recurrence {
     const val DAILY = "DAILY"
     const val WEEKLY = "WEEKLY"
     const val MONTHLY = "MONTHLY"
+    const val YEARLY = "YEARLY"
 
-    val all = listOf(NONE, DAILY, WEEKLY, MONTHLY)
+    val all = listOf(NONE, DAILY, WEEKLY, MONTHLY, YEARLY)
 
     fun label(value: String): String = when (value) {
         DAILY -> "Daily"
         WEEKLY -> "Weekly"
         MONTHLY -> "Monthly"
+        YEARLY -> "Yearly"
         else -> "Does not repeat"
     }
 }

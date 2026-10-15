@@ -7,6 +7,7 @@ import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.family.FamilyRepository
 import com.famcal.app.data.model.Family
 import com.famcal.app.notifications.PushTokenRegistrar
+import com.famcal.app.notifications.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,11 +36,14 @@ class AppViewModel @Inject constructor(
     private val familyRepository: FamilyRepository,
     private val activeFamilyStore: ActiveFamilyStore,
     private val pushTokenRegistrar: PushTokenRegistrar,
+    private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
 
     val uiState: StateFlow<AppUiState> = authRepository.authState
         .flatMapLatest { user ->
             if (user == null) {
+                // Signed out (or account deleted): drop every scheduled reminder.
+                reminderScheduler.retainFamilies(emptySet())
                 flowOf(AppUiState.SignedOut)
             } else {
                 flow<AppUiState> {
@@ -52,6 +56,8 @@ class AppViewModel @Inject constructor(
                             familyRepository.observeFamilies(user.uid),
                             activeFamilyStore.activeFamilyId,
                         ) { families, active ->
+                            // Drop reminders for families the user has left.
+                            reminderScheduler.retainFamilies(families.map { it.id }.toSet())
                             if (families.isEmpty()) {
                                 AppUiState.NeedsFamily
                             } else {

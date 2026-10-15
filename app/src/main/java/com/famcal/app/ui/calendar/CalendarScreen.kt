@@ -76,6 +76,7 @@ import com.famcal.app.util.EventOccurrence
 import com.famcal.app.util.formatDate
 import com.famcal.app.util.formatTime
 import com.famcal.app.util.formatTitle
+import com.famcal.app.util.toLocalDate
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.core.CalendarDay
@@ -118,6 +119,12 @@ fun CalendarScreen(
     )
     val scope = rememberCoroutineScope()
     val visibleMonth = calendarState.firstVisibleMonth.yearMonth
+
+    val openRequest by viewModel.openRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(openRequest) {
+        openRequest?.let(viewModel::handleOpenRequest)
+            ?.let { calendarState.animateScrollToMonth(YearMonth.from(it)) }
+    }
 
     Scaffold(
         topBar = {
@@ -327,7 +334,10 @@ private fun EventDetailSheet(
             if (event.location.isNotBlank()) DetailLine("📍  ${event.location}")
             if (assigneeName != null) DetailLine("👤  For $assigneeName")
             if (event.reminderMinutes != Reminders.NONE) DetailLine("🔔  ${Reminders.label(event.reminderMinutes)}")
-            if (event.recurrence != Recurrence.NONE) DetailLine("🔁  ${Recurrence.label(event.recurrence)}")
+            if (event.recurrence != Recurrence.NONE) {
+                val until = event.repeatUntil?.toLocalDate()?.let { " until ${it.formatDate()}" }.orEmpty()
+                DetailLine("🔁  ${Recurrence.label(event.recurrence)}$until")
+            }
             if (event.notes.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(event.notes, style = MaterialTheme.typography.bodyMedium)

@@ -10,6 +10,7 @@ import com.famcal.app.data.model.CalendarEvent
 import com.famcal.app.data.model.Member
 import com.famcal.app.data.model.Recurrence
 import com.famcal.app.data.model.Reminders
+import com.famcal.app.util.toLocalDate
 import com.famcal.app.util.toLocalDateTime
 import com.famcal.app.util.toTimestamp
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,6 +35,8 @@ data class EventFormState(
     val assignedTo: String = "",
     val reminderMinutes: Int = Reminders.NONE,
     val recurrence: String = Recurrence.NONE,
+    /** Last day a recurring event occurs on; null repeats forever. */
+    val repeatUntil: LocalDate? = null,
     val start: LocalDateTime = defaultStart(),
     val end: LocalDateTime = defaultStart().plusHours(1),
     val isEditing: Boolean = false,
@@ -127,6 +130,7 @@ class EventEditorViewModel @Inject constructor(
                             assignedTo = if (occurrenceDate != null) event.colorUid else event.assignedTo,
                             reminderMinutes = event.reminderMinutes,
                             recurrence = if (occurrenceDate != null) Recurrence.NONE else event.recurrence,
+                            repeatUntil = if (occurrenceDate != null) null else event.repeatUntil?.toLocalDate(),
                             start = start,
                             end = end,
                             isLoading = false,
@@ -146,13 +150,27 @@ class EventEditorViewModel @Inject constructor(
     fun onAllDayChange(value: Boolean) = _state.update { it.copy(allDay = value) }
     fun onAssignedToChange(uid: String) = _state.update { it.copy(assignedTo = uid) }
     fun onReminderChange(minutes: Int) = _state.update { it.copy(reminderMinutes = minutes) }
-    fun onRecurrenceChange(recurrence: String) = _state.update { it.copy(recurrence = recurrence) }
+    fun onRecurrenceChange(recurrence: String) = _state.update {
+        it.copy(
+            recurrence = recurrence,
+            repeatUntil = if (recurrence == Recurrence.NONE) null else it.repeatUntil,
+        )
+    }
+
+    /** Sets (or clears, with null) the series' last day; never earlier than the first. */
+    fun onRepeatUntilChange(date: LocalDate?) = _state.update {
+        it.copy(repeatUntil = date?.let { d -> maxOf(d, it.start.toLocalDate()) })
+    }
 
     fun onStartDateChange(date: LocalDate) = _state.update {
         val newStart = it.start.with(date)
         // Keep the same duration when the start moves.
         val duration = java.time.Duration.between(it.start, it.end)
-        it.copy(start = newStart, end = newStart.plus(duration))
+        it.copy(
+            start = newStart,
+            end = newStart.plus(duration),
+            repeatUntil = it.repeatUntil?.let { until -> maxOf(until, date) },
+        )
     }
 
     fun onStartTimeChange(time: LocalTime) = _state.update {
@@ -182,6 +200,10 @@ class EventEditorViewModel @Inject constructor(
                 assignedTo = current.assignedTo,
                 reminderMinutes = current.reminderMinutes,
                 recurrence = current.recurrence,
+                repeatUntil = current.repeatUntil
+                    ?.takeIf { current.recurrence != Recurrence.NONE }
+                    ?.atTime(LocalTime.MAX.withNano(0))
+                    ?.toTimestamp(),
                 excludedDates = if (occurrenceDate != null) emptyList() else excludedDates,
             )
             val result = when {

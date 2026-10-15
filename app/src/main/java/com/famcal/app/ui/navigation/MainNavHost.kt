@@ -1,6 +1,10 @@
 package com.famcal.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,6 +27,13 @@ import java.time.ZoneId
 @Composable
 fun MainNavHost(familyId: String) {
     val navController = rememberNavController()
+    val pendingNavigationViewModel: PendingNavigationViewModel = hiltViewModel()
+    val openRequest by pendingNavigationViewModel.openRequest.collectAsStateWithLifecycle()
+
+    // A tapped notification returns to the calendar from any screen.
+    LaunchedEffect(openRequest) {
+        if (openRequest != null) navController.popBackStack("home/$familyId", inclusive = false)
+    }
 
     NavHost(
         navController = navController,
@@ -33,6 +44,7 @@ fun MainNavHost(familyId: String) {
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) {
             HomeScreen(
+                showCalendarRequest = openRequest,
                 onAddEvent = { date ->
                     val millis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     navController.navigate("event/$familyId?dateMillis=$millis")

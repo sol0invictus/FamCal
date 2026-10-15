@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.famcal.app.R
+import java.time.LocalDate
 
 /** Fired by [ReminderScheduler]'s alarms; posts the reminder notification. */
 class AlarmReceiver : BroadcastReceiver() {
@@ -17,6 +18,8 @@ class AlarmReceiver : BroadcastReceiver() {
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "Event reminder"
         val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()
+        val date = intent.getStringExtra(EXTRA_DATE)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val familyId = intent.getStringExtra(EXTRA_FAMILY_ID)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -30,6 +33,9 @@ class AlarmReceiver : BroadcastReceiver() {
             .setContentTitle(title)
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(
+                openCalendarIntent(context, notificationId, familyId, date ?: LocalDate.now()),
+            )
             .setAutoCancel(true)
             .build()
 

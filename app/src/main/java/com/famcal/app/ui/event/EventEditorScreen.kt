@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
@@ -52,7 +53,7 @@ import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-private enum class PickerTarget { None, StartDate, StartTime, EndDate, EndTime }
+private enum class PickerTarget { None, StartDate, StartTime, EndDate, EndTime, RepeatUntil }
 
 private val fullDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE, MMM d, yyyy")
 
@@ -159,6 +160,22 @@ fun EventEditorScreen(
                     selected = state.recurrence,
                     onSelect = viewModel::onRecurrenceChange,
                 )
+                if (state.recurrence != Recurrence.NONE) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Until", modifier = Modifier.weight(1f))
+                        if (state.repeatUntil != null) {
+                            IconButton(onClick = { viewModel.onRepeatUntilChange(null) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Repeat forever")
+                            }
+                        }
+                        OutlinedButton(onClick = { picker = PickerTarget.RepeatUntil }) {
+                            Text(state.repeatUntil?.format(fullDateFormatter) ?: "Forever")
+                        }
+                    }
+                }
             }
 
             OutlinedTextField(
@@ -209,6 +226,11 @@ fun EventEditorScreen(
         PickerTarget.EndDate -> DatePickerSheet(
             initial = state.end.toLocalDate(),
             onConfirm = { viewModel.onEndDateChange(it); picker = PickerTarget.None },
+            onDismiss = { picker = PickerTarget.None },
+        )
+        PickerTarget.RepeatUntil -> DatePickerSheet(
+            initial = state.repeatUntil ?: state.start.toLocalDate().plusMonths(3),
+            onConfirm = { viewModel.onRepeatUntilChange(it); picker = PickerTarget.None },
             onDismiss = { picker = PickerTarget.None },
         )
         PickerTarget.StartTime -> TimePickerSheet(

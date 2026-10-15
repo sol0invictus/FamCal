@@ -7,6 +7,9 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Receives FCM messages (sent by the `notifyOnEventWrite` Cloud Function when a family
@@ -25,12 +28,19 @@ class FamcalMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val title = message.notification?.title ?: message.data["title"]
         if (title != null) {
+            val id = System.currentTimeMillis().toInt()
+            // Open on the event's day; a changed series opens on today.
+            val date = message.data["startMillis"]?.toLongOrNull()
+                ?.takeIf { message.data["recurring"] != "1" }
+                ?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
+                ?: LocalDate.now()
             postNotification(
                 context = this,
                 channelId = CHANNEL_UPDATES,
-                id = System.currentTimeMillis().toInt(),
+                id = id,
                 title = title,
                 text = message.notification?.body ?: message.data["body"].orEmpty(),
+                contentIntent = openCalendarIntent(this, id, message.data["familyId"], date),
             )
         }
         ReminderRescheduleWorker.refreshNow(this)

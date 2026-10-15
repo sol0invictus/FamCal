@@ -44,29 +44,35 @@ object RecurrenceExpander {
                 continue
             }
 
+            // Stop at the series' end date if it comes before the window's end.
+            val lastDate = event.repeatUntil?.toLocalDate()
+                ?.takeIf { it.isBefore(windowEnd) }
+                ?: windowEnd
+
+            // Occurrence n is computed from the series start (not the previous occurrence) so
+            // e.g. a monthly event on the 31st doesn't drift to the 28th after February.
+            var n = 0L
             var occStart = baseStart
-            var iterations = 0
             // Fast-forward to the window start.
-            while (occStart.toLocalDate().isBefore(windowStart) && iterations < MAX_ITERATIONS) {
-                occStart = advance(occStart, event.recurrence)
-                iterations++
+            while (occStart.toLocalDate().isBefore(windowStart) && n < MAX_ITERATIONS) {
+                occStart = nth(baseStart, event.recurrence, ++n)
             }
             // Emit occurrences across the window, skipping individually-deleted dates.
-            while (!occStart.toLocalDate().isAfter(windowEnd) && iterations < MAX_ITERATIONS) {
+            while (!occStart.toLocalDate().isAfter(lastDate) && n < MAX_ITERATIONS) {
                 if (occStart.toLocalDate().toString() !in event.excludedDates) {
                     result += EventOccurrence(event, occStart, occStart.plus(duration))
                 }
-                occStart = advance(occStart, event.recurrence)
-                iterations++
+                occStart = nth(baseStart, event.recurrence, ++n)
             }
         }
         return result.sortedBy { it.start }
     }
 
-    private fun advance(from: LocalDateTime, recurrence: String): LocalDateTime = when (recurrence) {
-        Recurrence.DAILY -> from.plusDays(1)
-        Recurrence.WEEKLY -> from.plusWeeks(1)
-        Recurrence.MONTHLY -> from.plusMonths(1)
-        else -> from.plusYears(1000) // unreachable; defensively avoid an infinite loop
+    private fun nth(start: LocalDateTime, recurrence: String, n: Long): LocalDateTime = when (recurrence) {
+        Recurrence.DAILY -> start.plusDays(n)
+        Recurrence.WEEKLY -> start.plusWeeks(n)
+        Recurrence.MONTHLY -> start.plusMonths(n)
+        Recurrence.YEARLY -> start.plusYears(n)
+        else -> start.plusYears(1000 * n) // unreachable; defensively avoid an infinite loop
     }
 }

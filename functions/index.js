@@ -74,6 +74,10 @@ exports.notifyOnEventWrite = onDocumentWritten(
       if (after && uid !== actor) {
         data.title = before ? "Event updated" : "New event";
         data.body = `${after.title || "(untitled)"} · ${familyName}`;
+        // Lets the app open on the event's day when the notification is tapped.
+        const start = toDate(after.startAt);
+        if (start) data.startMillis = String(start.getTime());
+        data.recurring = after.recurrence && after.recurrence !== "NONE" ? "1" : "0";
       } else if (after) {
         continue; // the person who made the change already has it scheduled locally
       }
@@ -126,7 +130,7 @@ function buildVevent(event, familyId) {
     lines.push(`DTEND:${formatUtc(end)}`);
   }
 
-  const rrule = toRrule(event.recurrence);
+  const rrule = toRrule(event);
   if (rrule) lines.push(rrule);
 
   // Exclude individually-deleted occurrences.
@@ -150,17 +154,24 @@ function buildVevent(event, familyId) {
   return lines;
 }
 
-function toRrule(recurrence) {
-  switch (recurrence) {
-    case "DAILY":
-      return "RRULE:FREQ=DAILY";
-    case "WEEKLY":
-      return "RRULE:FREQ=WEEKLY";
-    case "MONTHLY":
-      return "RRULE:FREQ=MONTHLY";
-    default:
-      return null;
+function toRrule(event) {
+  const freq = {
+    DAILY: "FREQ=DAILY",
+    WEEKLY: "FREQ=WEEKLY",
+    MONTHLY: "FREQ=MONTHLY",
+    YEARLY: "FREQ=YEARLY",
+  }[event.recurrence];
+  if (!freq) return null;
+
+  // repeatUntil is the end (23:59:59 local) of the series' last day.
+  const until = toDate(event.repeatUntil);
+  if (!until) return `RRULE:${freq}`;
+  if (event.allDay) {
+    // All-day DTSTARTs here are the UTC date of local midnight, so match that convention.
+    const lastDayStart = new Date(until.getTime() - (24 * 60 * 60 - 1) * 1000);
+    return `RRULE:${freq};UNTIL=${formatDate(lastDayStart)}`;
   }
+  return `RRULE:${freq};UNTIL=${formatUtc(until)}`;
 }
 
 function toDate(value) {

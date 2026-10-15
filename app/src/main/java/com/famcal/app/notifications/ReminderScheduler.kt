@@ -6,8 +6,12 @@ import android.content.Context
 import android.content.Intent
 import com.famcal.app.data.model.Reminders
 import com.famcal.app.util.EventOccurrence
+import com.famcal.app.util.formatDate
 import com.famcal.app.util.formatTime
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,11 +44,13 @@ class ReminderScheduler @Inject constructor(
             val minutes = occ.event.reminderMinutes
             if (minutes == Reminders.NONE) continue
 
-            val startMillis = occ.start.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            val triggerAt = startMillis - minutes * 60_000L
+            // All-day events are anchored to a morning time rather than midnight, so "at time
+            // of event" isn't 12:00 AM and "1 day before" isn't the middle of the night.
+            val anchor = if (occ.event.allDay) occ.date.atTime(ALL_DAY_REMINDER_TIME) else occ.start
+            val triggerAt = anchor.toEpochMillis() - minutes * 60_000L
             if (triggerAt < now || triggerAt > horizon) continue
 
-            scheduled += schedule(manager, occ, triggerAt)
+            scheduled += schedule(manager, familyId, occ, triggerAt)
         }
 
         (storedCodes(familyId) - scheduled).forEach { cancel(manager, it) }
@@ -63,12 +69,19 @@ class ReminderScheduler @Inject constructor(
         }
     }
 
-    private fun schedule(manager: AlarmManager, occ: EventOccurrence, triggerAt: Long): Int {
+    private fun schedule(
+        manager: AlarmManager,
+        familyId: String,
+        occ: EventOccurrence,
+        triggerAt: Long,
+    ): Int {
         val requestCode = (occ.event.id + "@" + occ.start.toString()).hashCode()
         val intent = alarmIntent().apply {
             putExtra(EXTRA_NOTIFICATION_ID, requestCode)
             putExtra(EXTRA_TITLE, occ.event.title.ifBlank { "Event reminder" })
-            putExtra(EXTRA_TEXT, "Starts at ${occ.start.formatTime()}")
+            putExtra(EXTRA_TEXT, reminderText(occ, triggerAt))
+            putExtra(EXTRA_FAMILY_ID, familyId)
+            putExtra(EXTRA_DATE, occ.date.toString())
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
@@ -98,6 +111,20 @@ class ReminderScheduler @Inject constructor(
 
     private fun alarmIntent() = Intent(context, AlarmReceiver::class.java)
 
+    /** e.g. "Today at 3:30 PM", "Tomorrow · All day", "Sat, Oct 17 at 9:00 AM". */
+    private fun reminderText(occ: EventOccurrence, triggerAt: Long): String {
+        val triggerDay = Instant.ofEpochMilli(triggerAt).atZone(ZoneId.systemDefault()).toLocalDate()
+        val day = when (occ.date) {
+            triggerDay -> "Today"
+            triggerDay.plusDays(1) -> "Tomorrow"
+            else -> occ.date.formatDate()
+        }
+        return if (occ.event.allDay) "$day · All day" else "$day at ${occ.start.formatTime()}"
+    }
+
+    private fun LocalDateTime.toEpochMillis(): Long =
+        atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
     private fun storedCodes(familyId: String): Set<Int> =
         prefs.getStringSet(familyId, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
 
@@ -108,5 +135,6 @@ class ReminderScheduler @Inject constructor(
     companion object {
         private const val PREFS_NAME = "reminder_alarms"
         private const val HORIZON_MILLIS = 7L * 24 * 60 * 60 * 1000
+        private val ALL_DAY_REMINDER_TIME: LocalTime = LocalTime.of(9, 0)
     }
 }

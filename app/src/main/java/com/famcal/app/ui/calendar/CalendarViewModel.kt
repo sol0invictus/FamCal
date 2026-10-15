@@ -3,6 +3,8 @@ package com.famcal.app.ui.calendar
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.famcal.app.data.OpenRequest
+import com.famcal.app.data.PendingNavigation
 import com.famcal.app.data.auth.AuthRepository
 import com.famcal.app.data.calendar.CalendarMirror
 import com.famcal.app.data.event.EventRepository
@@ -44,6 +46,7 @@ class CalendarViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val reminderScheduler: ReminderScheduler,
     private val calendarMirror: CalendarMirror,
+    private val pendingNavigation: PendingNavigation,
 ) : ViewModel() {
 
     val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId is required" }
@@ -52,6 +55,12 @@ class CalendarViewModel @Inject constructor(
 
     private val _messages = MutableSharedFlow<String>()
     val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    /**
+     * A tapped notification waiting to be shown. The screen handles it (only while visible),
+     * so it isn't consumed while the app is still in the background.
+     */
+    val openRequest: StateFlow<OpenRequest?> = pendingNavigation.request
 
     val uiState: StateFlow<CalendarUiState> = combine(
         familyRepository.observeFamily(familyId),
@@ -109,6 +118,14 @@ class CalendarViewModel @Inject constructor(
 
     fun selectDate(date: LocalDate) {
         selectedDate.value = date
+    }
+
+    /** Selects the notification's day if it's for this family; returns the day if handled. */
+    fun handleOpenRequest(request: OpenRequest): LocalDate? {
+        if (request.familyId != null && request.familyId != familyId) return null
+        pendingNavigation.consume()
+        selectDate(request.date)
+        return request.date
     }
 
     fun deleteEvent(eventId: String) {

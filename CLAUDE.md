@@ -60,11 +60,14 @@ server commits, so transient PERMISSION_DENIED is retried with backoff. Suspend 
 ### Firestore data model
 
 ```
-users/{uid}                         displayName, email, photoUrl, familyIds[]
+users/{uid}                         displayName, email, photoUrl, familyIds[], fcmTokens[]
 families/{familyId}                 name, ownerUid, memberUids[], inviteCode, feedToken
   members/{uid}                     displayName, email, role, colorIndex
   events/{eventId}                  title, notes, location, startAt, endAt, allDay,
-                                    createdBy, reminderMinutes, recurrence, updatedAt
+                                    createdBy, assignedTo, reminderMinutes, recurrence,
+                                    repeatUntil, excludedDates, updatedBy, updatedAt
+  lists/{listId}                    name, createdBy
+    items/{itemId}                  text, checked, createdBy
 invites/{code}                      familyId, familyName, ownerUid
 ```
 
@@ -86,7 +89,9 @@ the owner is the last one out.
   `MemberColors` (`ui/theme/Color.kt`). The UI builds a `uid → Member` map from the members
   subcollection; nothing about color is denormalized onto events.
 - **Recurrence is expanded client-side.** Stored events carry `recurrence`
-  (NONE/DAILY/WEEKLY/MONTHLY); `RecurrenceExpander.expand` turns them into `EventOccurrence`s
+  (NONE/DAILY/WEEKLY/MONTHLY/YEARLY) and optional `repeatUntil` (Timestamp = end of the last
+  day, so the server feed can emit RRULE `UNTIL`); `RecurrenceExpander.expand` computes
+  occurrence *n* from the series start (no month-end drift) and turns them into `EventOccurrence`s
   over a window (today −2mo … +12mo). The calendar renders **occurrences, not raw events**.
   Per-occurrence changes use `excludedDates` on the series: "this event only" delete just
   excludes the date; "this event only" edit excludes it and saves a standalone copy
@@ -96,7 +101,12 @@ the owner is the last one out.
   `setAndAllowWhileIdle`, 7-day horizon) tracks scheduled alarms per family and cancels stale
   ones on each `sync`. It's driven from `CalendarViewModel` while the app is open and, in the
   background, by `ReminderRescheduleWorker` (all families) — every 6h, on boot, and whenever an
-  FCM event-change message arrives. `AlarmReceiver` posts the notification.
+  FCM event-change message arrives. `AlarmReceiver` posts the notification. All-day reminders
+  are anchored at 9:00 AM on the day, not midnight.
+- **Notification taps** carry `familyId` + date extras (`openCalendarIntent`). `MainActivity`
+  switches the active family and hands an `OpenRequest` to the singleton `PendingNavigation`;
+  `MainNavHost` pops back to home, `HomeScreen` switches to the Calendar tab, and
+  `CalendarViewModel` consumes it (selects the day, scrolls the month).
 - Firebase/Firestore data classes need a no-arg constructor with defaults (all model classes
   follow this) and must not be obfuscated (relevant once R8/`proguard-rules.pro` matters).
 

@@ -24,6 +24,11 @@ data class CalendarEvent(
     val reminderMinutes: Int = -1,
     /** One of [Recurrence] values: NONE / DAILY / WEEKLY / MONTHLY. */
     val recurrence: String = Recurrence.NONE,
+    /**
+     * When a recurring event stops: the end of its last day (23:59:59 local), or null to
+     * repeat forever. Stored as an instant so the server-side iCal feed can emit RRULE UNTIL.
+     */
+    val repeatUntil: Timestamp? = null,
     /** ISO dates ("yyyy-MM-dd") of recurring occurrences to skip (deleted individually). */
     val excludedDates: List<String> = emptyList(),
     /** uid of whoever last wrote the event; push notifications skip this person. */
