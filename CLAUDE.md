@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 FamCal — a publishable Android **family calendar** app. Everyone in a family uses the app;
 events live in the app's own cloud (Firebase/Firestore) and sync in real time between members.
-App name **FamCal**, applicationId **`com.famcal.app`** (permanent — chosen for the store).
+App name **FamCal**, applicationId **`com.sunnyguha.famcal`** (permanent — registered on Google
+Play; `com.famcal.app` was already taken there). The code namespace/Kotlin packages stay
+`com.famcal.app`; only the applicationId differs.
 Android-only, minSdk 26, targetSdk/compileSdk 36.
 
 ## Build & run

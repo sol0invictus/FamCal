@@ -4,7 +4,7 @@ A shared **family calendar** for Android. Everyone in the family uses the app;
 events live in a shared cloud store and sync in real time across members' phones.
 
 - **App name:** FamCal
-- **Package / applicationId:** `com.famcal.app`
+- **Package / applicationId:** `com.sunnyguha.famcal` (code namespace: `com.famcal.app`)
 - **Min Android:** 8.0 (API 26) · **Target:** API 36
 
 ## Tech stack
@@ -106,7 +106,7 @@ app **won't build until `app/google-services.json` exists.** One-time setup:
 
 1. Go to the [Firebase console](https://console.firebase.google.com/) and create a
    project named **FamCal** (Google Analytics optional).
-2. Add an **Android app** with package name **`com.famcal.app`**.
+2. Add an **Android app** with package name **`com.sunnyguha.famcal`**.
 3. Download the generated **`google-services.json`** and drop it into the **`app/`** folder.
 4. **Authentication → Get started →** enable the **Email/Password** provider. *(Optional:
    also enable **Google** for the "Continue with Google" button — this auto-creates the

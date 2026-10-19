@@ -22,7 +22,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.famcal.app"
+        applicationId = "com.sunnyguha.famcal"
         minSdk = 26
         targetSdk = 36
         versionCode = 2
