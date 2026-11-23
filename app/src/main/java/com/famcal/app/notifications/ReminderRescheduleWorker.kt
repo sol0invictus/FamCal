@@ -44,10 +44,11 @@ class ReminderRescheduleWorker @AssistedInject constructor(
         val families = familyRepository.getFamiliesOnce(uid).getOrElse { return Result.retry() }
 
         val today = LocalDate.now()
+        // Look a week past the 7-day alarm horizon so "1 week before" reminders get armed.
         for (family in families) {
             // On failure keep that family's existing alarms rather than clearing them.
             val events = eventRepository.getEventsOnce(family.id).getOrNull() ?: continue
-            reminderScheduler.sync(family.id, RecurrenceExpander.expand(events, today, today.plusDays(8)))
+            reminderScheduler.sync(family.id, RecurrenceExpander.expand(events, today, today.plusDays(15)))
         }
         reminderScheduler.retainFamilies(families.map { it.id }.toSet())
         return Result.success()

@@ -35,6 +35,8 @@ data class EventFormState(
     val assignedTo: String = "",
     val reminderMinutes: Int = Reminders.NONE,
     val recurrence: String = Recurrence.NONE,
+    /** Repeat every N units; 0 while the field is cleared mid-edit (saved as 1). */
+    val repeatInterval: Int = 1,
     /** Last day a recurring event occurs on; null repeats forever. */
     val repeatUntil: LocalDate? = null,
     val start: LocalDateTime = defaultStart(),
@@ -130,6 +132,7 @@ class EventEditorViewModel @Inject constructor(
                             assignedTo = if (occurrenceDate != null) event.colorUid else event.assignedTo,
                             reminderMinutes = event.reminderMinutes,
                             recurrence = if (occurrenceDate != null) Recurrence.NONE else event.recurrence,
+                            repeatInterval = if (occurrenceDate != null) 1 else event.repeatInterval.coerceAtLeast(1),
                             repeatUntil = if (occurrenceDate != null) null else event.repeatUntil?.toLocalDate(),
                             start = start,
                             end = end,
@@ -155,6 +158,12 @@ class EventEditorViewModel @Inject constructor(
             recurrence = recurrence,
             repeatUntil = if (recurrence == Recurrence.NONE) null else it.repeatUntil,
         )
+    }
+
+    /** Digits only, capped at 999; blank is allowed while typing. */
+    fun onRepeatIntervalChange(text: String) = _state.update {
+        val digits = text.filter(Char::isDigit).take(3)
+        it.copy(repeatInterval = digits.toIntOrNull() ?: 0)
     }
 
     /** Sets (or clears, with null) the series' last day; never earlier than the first. */
@@ -200,6 +209,7 @@ class EventEditorViewModel @Inject constructor(
                 assignedTo = current.assignedTo,
                 reminderMinutes = current.reminderMinutes,
                 recurrence = current.recurrence,
+                repeatInterval = if (current.recurrence == Recurrence.NONE) 1 else current.repeatInterval.coerceAtLeast(1),
                 repeatUntil = current.repeatUntil
                     ?.takeIf { current.recurrence != Recurrence.NONE }
                     ?.atTime(LocalTime.MAX.withNano(0))

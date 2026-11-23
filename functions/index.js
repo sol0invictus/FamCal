@@ -155,13 +155,16 @@ function buildVevent(event, familyId) {
 }
 
 function toRrule(event) {
-  const freq = {
+  const base = {
     DAILY: "FREQ=DAILY",
     WEEKLY: "FREQ=WEEKLY",
     MONTHLY: "FREQ=MONTHLY",
     YEARLY: "FREQ=YEARLY",
   }[event.recurrence];
-  if (!freq) return null;
+  if (!base) return null;
+  // Every N units (e.g. INTERVAL=3 with FREQ=MONTHLY = quarterly). Older events lack it.
+  const interval = Number.isInteger(event.repeatInterval) ? event.repeatInterval : 1;
+  const freq = interval > 1 ? `${base};INTERVAL=${interval}` : base;
 
   // repeatUntil is the end (23:59:59 local) of the series' last day.
   const until = toDate(event.repeatUntil);

@@ -40,6 +40,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -161,6 +164,25 @@ fun EventEditorScreen(
                     onSelect = viewModel::onRecurrenceChange,
                 )
                 if (state.recurrence != Recurrence.NONE) {
+                    // e.g. "Every 3 months" for quarterly upkeep like an HVAC filter.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Every", modifier = Modifier.weight(1f))
+                        OutlinedTextField(
+                            value = if (state.repeatInterval == 0) "" else state.repeatInterval.toString(),
+                            onValueChange = viewModel::onRepeatIntervalChange,
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center),
+                            modifier = Modifier.width(72.dp),
+                        )
+                        Text(
+                            Recurrence.unit(state.recurrence, state.repeatInterval.coerceAtLeast(1)),
+                            modifier = Modifier.padding(start = 12.dp).width(64.dp),
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,

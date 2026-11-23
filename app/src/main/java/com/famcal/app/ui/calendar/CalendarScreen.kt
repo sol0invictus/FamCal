@@ -336,7 +336,7 @@ private fun EventDetailSheet(
             if (event.reminderMinutes != Reminders.NONE) DetailLine("🔔  ${Reminders.label(event.reminderMinutes)}")
             if (event.recurrence != Recurrence.NONE) {
                 val until = event.repeatUntil?.toLocalDate()?.let { " until ${it.formatDate()}" }.orEmpty()
-                DetailLine("🔁  ${Recurrence.label(event.recurrence)}$until")
+                DetailLine("🔁  ${Recurrence.label(event.recurrence, event.repeatInterval)}$until")
             }
             if (event.notes.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))

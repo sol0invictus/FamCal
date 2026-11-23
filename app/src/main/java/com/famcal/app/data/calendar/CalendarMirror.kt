@@ -186,13 +186,14 @@ class CalendarMirror @Inject constructor(
     }
 
     private fun toRrule(event: CalendarEvent): String? {
-        val freq = when (event.recurrence) {
+        val base = when (event.recurrence) {
             Recurrence.DAILY -> "FREQ=DAILY"
             Recurrence.WEEKLY -> "FREQ=WEEKLY"
             Recurrence.MONTHLY -> "FREQ=MONTHLY"
             Recurrence.YEARLY -> "FREQ=YEARLY"
             else -> return null
         }
+        val freq = if (event.repeatInterval > 1) "$base;INTERVAL=${event.repeatInterval}" else base
         val until = event.repeatUntil ?: return freq
         // All-day series use a DATE; timed series need UNTIL as a UTC date-time.
         val untilValue = if (event.allDay) {
@@ -207,7 +208,7 @@ class CalendarMirror @Inject constructor(
         val basis = listOf(
             event.title, event.notes, event.location,
             event.startAt.seconds, event.endAt.seconds,
-            event.allDay, event.recurrence, event.repeatUntil?.seconds,
+            event.allDay, event.recurrence, event.repeatInterval, event.repeatUntil?.seconds,
             event.excludedDates.sorted().joinToString(","),
         ).joinToString("|")
         return basis.hashCode().toString()

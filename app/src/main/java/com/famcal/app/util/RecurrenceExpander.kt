@@ -49,30 +49,32 @@ object RecurrenceExpander {
                 ?.takeIf { it.isBefore(windowEnd) }
                 ?: windowEnd
 
+            val interval = event.repeatInterval.coerceAtLeast(1).toLong()
             // Occurrence n is computed from the series start (not the previous occurrence) so
             // e.g. a monthly event on the 31st doesn't drift to the 28th after February.
             var n = 0L
             var occStart = baseStart
             // Fast-forward to the window start.
             while (occStart.toLocalDate().isBefore(windowStart) && n < MAX_ITERATIONS) {
-                occStart = nth(baseStart, event.recurrence, ++n)
+                occStart = nth(baseStart, event.recurrence, ++n * interval)
             }
             // Emit occurrences across the window, skipping individually-deleted dates.
             while (!occStart.toLocalDate().isAfter(lastDate) && n < MAX_ITERATIONS) {
                 if (occStart.toLocalDate().toString() !in event.excludedDates) {
                     result += EventOccurrence(event, occStart, occStart.plus(duration))
                 }
-                occStart = nth(baseStart, event.recurrence, ++n)
+                occStart = nth(baseStart, event.recurrence, ++n * interval)
             }
         }
         return result.sortedBy { it.start }
     }
 
-    private fun nth(start: LocalDateTime, recurrence: String, n: Long): LocalDateTime = when (recurrence) {
-        Recurrence.DAILY -> start.plusDays(n)
-        Recurrence.WEEKLY -> start.plusWeeks(n)
-        Recurrence.MONTHLY -> start.plusMonths(n)
-        Recurrence.YEARLY -> start.plusYears(n)
-        else -> start.plusYears(1000 * n) // unreachable; defensively avoid an infinite loop
+    /** The start [units] repeat-units after [start] (occurrence n is n × interval units). */
+    private fun nth(start: LocalDateTime, recurrence: String, units: Long): LocalDateTime = when (recurrence) {
+        Recurrence.DAILY -> start.plusDays(units)
+        Recurrence.WEEKLY -> start.plusWeeks(units)
+        Recurrence.MONTHLY -> start.plusMonths(units)
+        Recurrence.YEARLY -> start.plusYears(units)
+        else -> start.plusYears(1000 * units) // unreachable; defensively avoid an infinite loop
     }
 }

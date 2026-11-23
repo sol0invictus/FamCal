@@ -22,8 +22,10 @@ data class CalendarEvent(
     val assignedTo: String = "",
     /** Minutes before start to remind; -1 means no reminder, 0 means at start time. */
     val reminderMinutes: Int = -1,
-    /** One of [Recurrence] values: NONE / DAILY / WEEKLY / MONTHLY. */
+    /** One of [Recurrence] values: NONE / DAILY / WEEKLY / MONTHLY / YEARLY. */
     val recurrence: String = Recurrence.NONE,
+    /** Repeat every N units of [recurrence] (e.g. 3 + MONTHLY = quarterly). Older events lack it → 1. */
+    val repeatInterval: Int = 1,
     /**
      * When a recurring event stops: the end of its last day (23:59:59 local), or null to
      * repeat forever. Stored as an instant so the server-side iCal feed can emit RRULE UNTIL.
