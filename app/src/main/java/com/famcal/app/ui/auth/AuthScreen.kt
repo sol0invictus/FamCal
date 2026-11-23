@@ -13,18 +13,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -36,8 +32,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val googleAvailable = remember { viewModel.isGoogleSignInAvailable(context) }
+    val resetState by viewModel.passwordReset.state.collectAsStateWithLifecycle()
+
+    PasswordResetDialog(
+        state = resetState,
+        onEmailChange = viewModel.passwordReset::onEmailChange,
+        onSend = viewModel.passwordReset::send,
+        onEditEmail = viewModel.passwordReset::editEmail,
+        onDismiss = viewModel::closePasswordReset,
+    )
 
     Column(
         modifier = Modifier
@@ -116,7 +119,7 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
 
         if (!state.isSignUp) {
             TextButton(
-                onClick = viewModel::sendPasswordReset,
+                onClick = viewModel::openPasswordReset,
                 enabled = !state.isSubmitting,
                 modifier = Modifier.align(Alignment.End),
             ) {
@@ -138,20 +141,6 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                 )
             } else {
                 Text(if (state.isSignUp) "Sign up" else "Sign in")
-            }
-        }
-
-        if (googleAvailable) {
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedButton(
-                onClick = { viewModel.signInWithGoogle(context) },
-                enabled = !state.isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Continue with Google")
             }
         }
 

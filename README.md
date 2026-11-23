@@ -22,7 +22,7 @@ events live in a shared cloud store and sync in real time across members' phones
 ## Roadmap
 
 - **M0 — Project skeleton** ✅ runnable Compose app, Hilt, theming, navigation, launcher icon.
-- **M1 — Auth + family** ✅ *(code complete — needs your Firebase project)* email/Google sign-in, create/join family via invite code, Firestore security rules.
+- **M1 — Auth + family** ✅ *(code complete — needs your Firebase project)* email/password sign-in (with password reset), create/join family via invite code, Firestore security rules.
 - **M2 — Core calendar** ✅ month view (Kizitonwose), create/edit/delete events, real-time sync, per-member colors, agenda for the selected day.
 - **Shared lists** ✅ groceries/to-dos/chores per family with real-time sync; bottom-nav **Calendar | Lists** home shell.
 - **M3 — Polish** ✅ reminders (local notifications), recurring events (daily/weekly/monthly), settings screen.
@@ -108,9 +108,10 @@ app **won't build until `app/google-services.json` exists.** One-time setup:
    project named **FamCal** (Google Analytics optional).
 2. Add an **Android app** with package name **`com.sunnyguha.famcal`**.
 3. Download the generated **`google-services.json`** and drop it into the **`app/`** folder.
-4. **Authentication → Get started →** enable the **Email/Password** provider. *(Optional:
-   also enable **Google** for the "Continue with Google" button — this auto-creates the
-   web client the app needs; without it that button just shows a friendly error.)*
+4. **Authentication → Get started →** enable the **Email/Password** provider (the app's only
+   sign-in method). Under **Authentication → Templates → Password reset**, set the sender name
+   to "FamCal", and set **Project settings → Public-facing name** to "FamCal" so reset emails
+   don't show the raw project id.
 5. **Firestore Database → Create database** (Production mode, pick a region).
 6. **Firestore → Rules:** paste the contents of [`firestore.rules`](firestore.rules) and
    **Publish**.

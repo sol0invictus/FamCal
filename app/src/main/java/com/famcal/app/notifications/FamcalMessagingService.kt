@@ -27,7 +27,8 @@ class FamcalMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val title = message.notification?.title ?: message.data["title"]
-        if (title != null) {
+        // Family-update notifications can be switched off in Settings; reminders still refresh.
+        if (title != null && NotificationPrefs.updatesEnabled(this)) {
             val id = System.currentTimeMillis().toInt()
             // Open on the event's day; a changed series opens on today.
             val date = message.data["startMillis"]?.toLongOrNull()

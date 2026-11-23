@@ -34,7 +34,9 @@ enabled, so the build fails without it. It's created in the Firebase console (se
 ## Architecture
 
 **Stack:** Kotlin, Jetpack Compose + Material 3, single-activity, MVVM, Hilt DI,
-Coroutines/Flow, Firebase Auth + Firestore + Messaging. Calendar grid via Kizitonwose
+Coroutines/Flow, Firebase Auth + Firestore + Messaging. Sign-in is **email/password only**
+(Google sign-in was deliberately removed at the owner's request; don't re-add it), with an
+in-app password-reset dialog (`ui/auth/PasswordReset.kt`) shared by sign-in and Settings. Calendar grid via Kizitonwose
 Calendar Compose. Uses `java.time` directly (minSdk 26).
 
 **State-driven navigation (no global nav graph).** `MainActivity` → `FamCalRoot` observes

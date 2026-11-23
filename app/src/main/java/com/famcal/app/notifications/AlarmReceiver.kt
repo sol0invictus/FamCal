@@ -15,6 +15,9 @@ import java.time.LocalDate
 /** Fired by [ReminderScheduler]'s alarms; posts the reminder notification. */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // An alarm armed before reminders were switched off.
+        if (!NotificationPrefs.remindersEnabled(context)) return
+
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "Event reminder"
         val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()

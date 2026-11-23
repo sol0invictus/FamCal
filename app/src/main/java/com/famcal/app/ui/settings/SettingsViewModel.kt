@@ -11,6 +11,10 @@ import com.famcal.app.data.calendar.CalendarSyncStore
 import com.famcal.app.data.calendar.DeviceCalendar
 import com.famcal.app.data.event.EventRepository
 import com.famcal.app.data.family.FamilyRepository
+import com.famcal.app.notifications.NotificationPrefs
+import com.famcal.app.ui.auth.PasswordResetController
+import com.famcal.app.notifications.ReminderRescheduleWorker
+import com.famcal.app.notifications.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,11 +34,13 @@ data class SettingsUiState(
     val feedUrl: String? = null,
     val calendarSyncEnabled: Boolean = false,
     val calendarSyncName: String = "",
+    val remindersEnabled: Boolean = true,
+    val updatesEnabled: Boolean = true,
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val accountRepository: AccountRepository,
@@ -42,6 +48,8 @@ class SettingsViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val calendarMirror: CalendarMirror,
     private val calendarSyncStore: CalendarSyncStore,
+    private val notificationPrefs: NotificationPrefs,
+    private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
 
     private val _deleteError = MutableStateFlow<String?>(null)
@@ -58,7 +66,9 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = combine(
         familyRepository.observeFamily(familyId),
         calendarSyncStore.settings,
-    ) { family, sync ->
+        notificationPrefs.reminders,
+        notificationPrefs.updates,
+    ) { family, sync, reminders, updates ->
         SettingsUiState(
             displayName = displayName,
             email = email,
@@ -67,6 +77,8 @@ class SettingsViewModel @Inject constructor(
             feedUrl = feedUrl(family?.feedToken),
             calendarSyncEnabled = sync.enabled,
             calendarSyncName = sync.calendarName,
+            remindersEnabled = reminders,
+            updatesEnabled = updates,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -108,10 +120,26 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setRemindersEnabled(enabled: Boolean) {
+        notificationPrefs.setReminders(enabled)
+        // Off: cancel what's armed now. On: re-arm upcoming reminders for every family.
+        if (enabled) ReminderRescheduleWorker.refreshNow(context) else reminderScheduler.cancelAll()
+    }
+
+    fun setUpdatesEnabled(enabled: Boolean) = notificationPrefs.setUpdates(enabled)
+
     fun renameFamily(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch { familyRepository.renameFamily(familyId, name) }
     }
+
+    /** Only email/password accounts have a password to change (Google-only ones don't). */
+    val canChangePassword: Boolean = authRepository.hasPasswordSignIn && email.isNotBlank()
+
+    /** Change password = email a reset link to the signed-in account's own address. */
+    val passwordReset = PasswordResetController(viewModelScope, authRepository)
+
+    fun openChangePassword() = passwordReset.open(email, locked = true)
 
     fun signOut() = authRepository.signOut()
 

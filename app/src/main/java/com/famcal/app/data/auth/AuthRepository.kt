@@ -2,7 +2,6 @@ package com.famcal.app.data.auth
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -52,15 +51,20 @@ class AuthRepository @Inject constructor(
             requireNotNull(result.user) { "Sign-in returned no user" }
         }
 
-    suspend fun signInWithGoogle(idToken: String): Result<FirebaseUser> = runCatching {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        val result = auth.signInWithCredential(credential).await()
-        requireNotNull(result.user) { "Google sign-in returned no user" }
-    }
-
+    /**
+     * Emails a Firebase password-reset link. The link opens Firebase's hosted page where the
+     * user picks a new password; they then sign in here with it. The email is sent in the
+     * device's language. With Firebase's email-enumeration protection on (the default for
+     * newer projects) this succeeds even when no account uses [email], and sends nothing.
+     */
     suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {
+        auth.useAppLanguage()
         auth.sendPasswordResetEmail(email.trim()).await()
     }
+
+    /** True when the signed-in user can sign in with an email + password (vs. Google only). */
+    val hasPasswordSignIn: Boolean
+        get() = auth.currentUser?.providerData?.any { it.providerId == "password" } == true
 
     fun signOut() = auth.signOut()
 }

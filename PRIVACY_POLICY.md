@@ -10,8 +10,8 @@ FamCal ("we", "the app") is a shared family calendar. This policy explains what 
 why, and your choices.
 
 ## Information we collect
-- **Account information:** your name and email address, provided when you sign up (via email
-  or Google sign-in).
+- **Account information:** your name and email address, provided when you sign up with an
+  email and password.
 - **Calendar content:** events you create — titles, notes, locations, dates/times, reminders,
   and recurrence — shared lists and list items, and the families and members you belong to.
 - **Device push token:** an identifier used to send you notifications about changes your

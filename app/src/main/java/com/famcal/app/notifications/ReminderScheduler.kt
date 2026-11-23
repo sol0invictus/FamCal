@@ -40,7 +40,9 @@ class ReminderScheduler @Inject constructor(
         val horizon = now + HORIZON_MILLIS
 
         val scheduled = mutableSetOf<Int>()
-        for (occ in occurrences) {
+        // Reminders switched off in Settings: schedule nothing, which cancels what's armed.
+        val active = if (NotificationPrefs.remindersEnabled(context)) occurrences else emptyList()
+        for (occ in active) {
             val minutes = occ.event.reminderMinutes
             if (minutes == Reminders.NONE) continue
 
@@ -68,6 +70,9 @@ class ReminderScheduler @Inject constructor(
             }
         }
     }
+
+    /** Cancels every armed reminder (reminders switched off in Settings). */
+    fun cancelAll() = retainFamilies(emptySet())
 
     private fun schedule(
         manager: AlarmManager,

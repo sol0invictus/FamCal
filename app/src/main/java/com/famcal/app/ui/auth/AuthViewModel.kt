@@ -1,10 +1,10 @@
 package com.famcal.app.ui.auth
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.famcal.app.data.auth.AuthRepository
-import com.famcal.app.data.auth.GoogleSignInClient
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
@@ -40,7 +40,6 @@ data class AuthFormState(
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val googleSignInClient: GoogleSignInClient,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthFormState())
@@ -70,39 +69,28 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    /** Google sign-in only works once a web client ID is configured in Firebase. */
-    fun isGoogleSignInAvailable(context: Context): Boolean = googleSignInClient.isConfigured(context)
+    /** "Forgot password?" dialog, prefilled with whatever is in the email field. */
+    val passwordReset = PasswordResetController(viewModelScope, authRepository)
 
-    fun signInWithGoogle(context: Context) {
-        _state.update { it.copy(isSubmitting = true, error = null, info = null) }
-        viewModelScope.launch {
-            googleSignInClient.signIn(context)
-                .mapCatching { idToken -> authRepository.signInWithGoogle(idToken).getOrThrow() }
-                .onFailure { e -> _state.update { it.copy(error = e.friendlyMessage()) } }
-            _state.update { it.copy(isSubmitting = false) }
-        }
-    }
+    fun openPasswordReset() = passwordReset.open(_state.value.email)
 
-    fun sendPasswordReset() {
-        val email = _state.value.email
-        if (email.isBlank()) {
-            _state.update { it.copy(error = "Enter your email above first, then tap this.") }
-            return
+    fun closePasswordReset() {
+        // Carry the address back to the sign-in form so only the new password is left to type.
+        passwordReset.state.value.sentTo?.let { sent ->
+            _state.update { it.copy(email = sent, password = "", error = null, info = null) }
         }
-        _state.update { it.copy(isSubmitting = true, error = null, info = null) }
-        viewModelScope.launch {
-            authRepository.sendPasswordReset(email)
-                .onSuccess { _state.update { it.copy(info = "Password reset email sent to $email.") } }
-                .onFailure { e -> _state.update { it.copy(error = e.friendlyMessage()) } }
-            _state.update { it.copy(isSubmitting = false) }
-        }
+        passwordReset.close()
     }
 
     private fun Throwable.friendlyMessage(): String = when (this) {
         is FirebaseAuthWeakPasswordException -> "Password must be at least 6 characters."
         is FirebaseAuthUserCollisionException -> "An account with that email already exists. Try signing in."
         is FirebaseAuthInvalidUserException -> "No account found with that email."
-        is FirebaseAuthInvalidCredentialsException -> "Incorrect email or password."
+        is FirebaseAuthInvalidCredentialsException ->
+            "Incorrect email or password. Forgot it? Tap \"Forgot password?\" below."
+        is FirebaseTooManyRequestsException ->
+            "Too many attempts. Wait a few minutes, or reset your password with \"Forgot password?\"."
+        is FirebaseNetworkException -> "No internet connection. Connect and try again."
         else -> "Something went wrong. Please check your connection and try again."
     }
 }

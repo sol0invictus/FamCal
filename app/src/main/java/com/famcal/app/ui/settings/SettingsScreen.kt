@@ -1,6 +1,8 @@
 package com.famcal.app.ui.settings
 
 import android.Manifest
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -38,9 +40,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.famcal.app.ui.auth.PasswordResetDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +64,23 @@ fun SettingsScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val resetState by viewModel.passwordReset.state.collectAsStateWithLifecycle()
+    PasswordResetDialog(
+        state = resetState,
+        onEmailChange = viewModel.passwordReset::onEmailChange,
+        onSend = viewModel.passwordReset::send,
+        onEditEmail = viewModel.passwordReset::editEmail,
+        onDismiss = viewModel.passwordReset::close,
+    )
+    // Whether Android lets FamCal post at all (permission denied / blocked in system settings).
+    // Re-checked on resume so it updates after the user returns from system settings.
+    var systemNotificationsOn by remember {
+        mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        systemNotificationsOn = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
 
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -101,6 +125,9 @@ fun SettingsScreen(
             Section("Account") {
                 LabeledValue("Name", state.displayName.ifBlank { "—" })
                 LabeledValue("Email", state.email.ifBlank { "—" })
+                if (viewModel.canChangePassword) {
+                    TextButton(onClick = viewModel::openChangePassword) { Text("Change password") }
+                }
             }
 
             Section("Family") {
@@ -117,6 +144,39 @@ fun SettingsScreen(
                         showRename = true
                     },
                 ) { Text("Rename family") }
+            }
+
+            Section("Notifications") {
+                SwitchRow(
+                    title = "Event reminders",
+                    subtitle = "Alerts before events that have a reminder set",
+                    checked = state.remindersEnabled,
+                    onCheckedChange = viewModel::setRemindersEnabled,
+                )
+                HorizontalDivider()
+                SwitchRow(
+                    title = "Family updates",
+                    subtitle = "When someone adds or changes an event",
+                    checked = state.updatesEnabled,
+                    onCheckedChange = viewModel::setUpdatesEnabled,
+                )
+                if (!systemNotificationsOn) {
+                    Text(
+                        "Notifications are turned off for FamCal in Android settings, so " +
+                            "nothing will show until you allow them.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    TextButton(
+                        onClick = {
+                            context.startActivity(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                            )
+                        },
+                    ) { Text("Open notification settings") }
+                }
             }
 
             Section("Add to Google or Outlook") {
@@ -322,6 +382,32 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         Card {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) { content() }
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
