@@ -7,8 +7,18 @@ import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** A request (from a tapped notification) to show a family's calendar on a given day. */
-data class OpenRequest(val familyId: String?, val date: LocalDate)
+/**
+ * A request from a tapped notification or widget: show a family's calendar on [date], or its
+ * Tasks tab (opening [taskId] when given).
+ */
+data class OpenRequest(
+    val familyId: String?,
+    val date: LocalDate? = null,
+    val target: Target = Target.CALENDAR,
+    val taskId: String? = null,
+) {
+    enum class Target { CALENDAR, TASKS }
+}
 
 /**
  * Hands a tapped notification's target from [com.famcal.app.MainActivity] to the calendar.

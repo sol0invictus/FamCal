@@ -51,6 +51,8 @@ class ReminderRescheduleWorker @AssistedInject constructor(
             reminderScheduler.sync(family.id, RecurrenceExpander.expand(events, today, today.plusDays(15)))
         }
         reminderScheduler.retainFamilies(families.map { it.id }.toSet())
+        // Safety net in case the daily task-summary alarm was dropped.
+        TaskDigest.schedule(applicationContext)
         return Result.success()
     }
 

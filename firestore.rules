@@ -88,6 +88,22 @@ service cloud.firestore {
           allow read, write: if signedIn() && request.auth.uid in familyMembers(familyId);
         }
       }
+
+      // Household tasks: any member can create, edit, complete, or delete them.
+      match /tasks/{taskId} {
+        allow read, write: if signedIn() && request.auth.uid in familyMembers(familyId);
+      }
+
+      // Task completion log (points/history). Members log their own completions; entries
+      // are never edited, only removed (Undo).
+      match /taskCompletions/{completionId} {
+        allow read: if signedIn() && request.auth.uid in familyMembers(familyId);
+        allow create: if signedIn()
+          && request.auth.uid in familyMembers(familyId)
+          && request.resource.data.doneBy == request.auth.uid;
+        allow delete: if signedIn() && request.auth.uid in familyMembers(familyId);
+        allow update: if false;
+      }
     }
   }
 }

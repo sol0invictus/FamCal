@@ -15,6 +15,7 @@ import com.famcal.app.notifications.NotificationPrefs
 import com.famcal.app.ui.auth.PasswordResetController
 import com.famcal.app.notifications.ReminderRescheduleWorker
 import com.famcal.app.notifications.ReminderScheduler
+import com.famcal.app.notifications.TaskDigest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,14 @@ data class SettingsUiState(
     val calendarSyncName: String = "",
     val remindersEnabled: Boolean = true,
     val updatesEnabled: Boolean = true,
+)
+
+/** Task notification settings (kept apart from [SettingsUiState] to stay within combine's arity). */
+data class TaskNotificationSettings(
+    val reminders: Boolean = true,
+    val updates: Boolean = true,
+    /** Summary time as minutes after midnight. */
+    val digestMinutes: Int = 8 * 60,
 )
 
 @HiltViewModel
@@ -127,6 +136,25 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setUpdatesEnabled(enabled: Boolean) = notificationPrefs.setUpdates(enabled)
+
+    val taskNotifications: StateFlow<TaskNotificationSettings> = combine(
+        notificationPrefs.taskReminders,
+        notificationPrefs.taskUpdates,
+        notificationPrefs.digestMinutes,
+    ) { reminders, updates, minutes -> TaskNotificationSettings(reminders, updates, minutes) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TaskNotificationSettings())
+
+    fun setTaskRemindersEnabled(enabled: Boolean) {
+        notificationPrefs.setTaskReminders(enabled)
+        TaskDigest.schedule(context) // arms or cancels the daily alarm
+    }
+
+    fun setTaskUpdatesEnabled(enabled: Boolean) = notificationPrefs.setTaskUpdates(enabled)
+
+    fun setDigestTime(hour: Int, minute: Int) {
+        notificationPrefs.setDigestMinutes(hour * 60 + minute)
+        TaskDigest.schedule(context)
+    }
 
     fun renameFamily(name: String) {
         if (name.isBlank()) return

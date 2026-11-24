@@ -212,6 +212,8 @@ class FamilyRepository @Inject constructor(
             docs += list.reference.collection(SUBCOLLECTION_ITEMS).get().await().documents.map { it.reference }
         }
         docs += lists.map { it.reference }
+        docs += ref.collection(SUBCOLLECTION_TASKS).get().await().documents.map { it.reference }
+        docs += ref.collection(SUBCOLLECTION_TASK_COMPLETIONS).get().await().documents.map { it.reference }
         // Firestore batches are capped at 500 writes.
         for (chunk in docs.chunked(MAX_BATCH_WRITES)) {
             firestore.runBatch { batch -> chunk.forEach { batch.delete(it) } }.await()
@@ -241,6 +243,8 @@ class FamilyRepository @Inject constructor(
         private const val SUBCOLLECTION_EVENTS = "events"
         private const val SUBCOLLECTION_LISTS = "lists"
         private const val SUBCOLLECTION_ITEMS = "items"
+        private const val SUBCOLLECTION_TASKS = "tasks"
+        private const val SUBCOLLECTION_TASK_COMPLETIONS = "taskCompletions"
         private const val MAX_BATCH_WRITES = 450
         private const val INVITE_CODE_LENGTH = 6
         // Omit easily-confused characters (0/O, 1/I) for codes people read aloud.

@@ -93,6 +93,83 @@ exports.notifyOnEventWrite = onDocumentWritten(
   }
 );
 
+// Household-task pushes (data-only, type "task"):
+//  - "New task for you" when a task is (re)assigned to someone other than the editor.
+//  - "Your turn: ..." when a rotation hands a repeating task to the next person.
+//  - "<name> finished: ..." to everyone else when a task is marked done.
+// Every member also gets a silent refresh so home-screen widgets stay current.
+exports.notifyOnTaskWrite = onDocumentWritten(
+  "families/{familyId}/tasks/{taskId}",
+  async (event) => {
+    const after = event.data && event.data.after && event.data.after.data();
+    const before = event.data && event.data.before && event.data.before.data();
+    const familyId = event.params.familyId;
+    const taskId = event.params.taskId;
+    const db = admin.firestore();
+    const familySnap = await db.collection("families").doc(familyId).get();
+    if (!familySnap.exists) return;
+    const memberUids = familySnap.get("memberUids") || [];
+
+    const messages = {}; // uid -> { title, body }
+    if (after) {
+      const actor = after.updatedBy || after.createdBy || "";
+      const title = after.title || "Task";
+      // Only a newer completion counts; an undo moves lastDoneAt back and must stay quiet.
+      const doneNow = !!after.lastDoneAt &&
+        (!before || !before.lastDoneAt || isLater(after.lastDoneAt, before.lastDoneAt));
+      const assignee = after.assignedTo || "";
+      const assigneeChanged = assignee && (!before || (before.assignedTo || "") !== assignee);
+
+      if (doneNow) {
+        const doer = after.lastDoneBy || actor;
+        const name = await memberName(db, familyId, doer);
+        for (const uid of memberUids) {
+          if (uid !== doer) messages[uid] = { title: `${name} finished: ${title}`, body: "Nice work! ⭐" };
+        }
+        if (assigneeChanged && assignee !== doer) {
+          messages[assignee] = { title: `Your turn: ${title}`, body: dueText(after.dueDate) };
+        }
+      } else if (assigneeChanged && assignee !== actor) {
+        messages[assignee] = { title: "New task for you", body: `${title} · ${dueText(after.dueDate)}` };
+      }
+    }
+
+    const sends = [];
+    for (const uid of memberUids) {
+      const userSnap = await db.collection("users").doc(uid).get();
+      const tokens = userSnap.get("fcmTokens");
+      if (!Array.isArray(tokens) || !tokens.length) continue;
+      const data = { type: "task", familyId, taskId };
+      const msg = messages[uid];
+      if (msg) Object.assign(data, msg);
+      sends.push(
+        admin.messaging().sendEachForMulticast({
+          tokens,
+          data,
+          android: { priority: msg ? "high" : "normal" },
+        })
+      );
+    }
+    await Promise.all(sends);
+  }
+);
+
+async function memberName(db, familyId, uid) {
+  if (!uid) return "Someone";
+  const snap = await db.collection("families").doc(familyId).collection("members").doc(uid).get();
+  return (snap.exists && snap.get("displayName")) || "Someone";
+}
+
+function isLater(a, b) {
+  const da = toDate(a);
+  const dbt = toDate(b);
+  return !!da && (!dbt || da.getTime() > dbt.getTime());
+}
+
+function dueText(iso) {
+  return iso ? `Due ${iso}` : "No due date";
+}
+
 function buildIcs(calendarName, familyId, events) {
   const lines = [
     "BEGIN:VCALENDAR",

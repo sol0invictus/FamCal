@@ -17,6 +17,10 @@ import com.famcal.app.ui.home.HomeScreen
 import com.famcal.app.ui.lists.ListDetailScreen
 import com.famcal.app.ui.search.SearchScreen
 import com.famcal.app.ui.settings.SettingsScreen
+import com.famcal.app.ui.tasks.LeaderboardScreen
+import com.famcal.app.ui.tasks.StarterPacksScreen
+import com.famcal.app.ui.tasks.TaskDetailScreen
+import com.famcal.app.ui.tasks.TaskEditorScreen
 import java.time.ZoneId
 
 /**
@@ -30,7 +34,7 @@ fun MainNavHost(familyId: String) {
     val pendingNavigationViewModel: PendingNavigationViewModel = hiltViewModel()
     val openRequest by pendingNavigationViewModel.openRequest.collectAsStateWithLifecycle()
 
-    // A tapped notification returns to the calendar from any screen.
+    // A tapped notification/widget returns to the home tabs from any screen.
     LaunchedEffect(openRequest) {
         if (openRequest != null) navController.popBackStack("home/$familyId", inclusive = false)
     }
@@ -44,7 +48,7 @@ fun MainNavHost(familyId: String) {
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) {
             HomeScreen(
-                showCalendarRequest = openRequest,
+                openRequest = openRequest,
                 onAddEvent = { date ->
                     val millis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     navController.navigate("event/$familyId?dateMillis=$millis")
@@ -56,7 +60,48 @@ fun MainNavHost(familyId: String) {
                 onOpenSettings = { navController.navigate("settings/$familyId") },
                 onOpenSearch = { navController.navigate("search/$familyId") },
                 onOpenList = { listId -> navController.navigate("list/$familyId/$listId") },
+                onAddTask = { navController.navigate("taskEdit/$familyId") },
+                onOpenTask = { taskId -> navController.navigate("task/$familyId/$taskId") },
+                onOpenLeaderboard = { navController.navigate("taskBoard/$familyId") },
+                onOpenStarterPacks = { navController.navigate("taskPacks/$familyId") },
             )
+        }
+
+        composable(
+            route = "task/{familyId}/{taskId}",
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("taskId") { type = NavType.StringType },
+            ),
+        ) {
+            TaskDetailScreen(
+                onBack = { navController.popBackStack() },
+                onEdit = { taskId -> navController.navigate("taskEdit/$familyId?taskId=$taskId") },
+            )
+        }
+
+        composable(
+            route = "taskEdit/{familyId}?taskId={taskId}",
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("taskId") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) {
+            TaskEditorScreen(onClose = { navController.popBackStack() })
+        }
+
+        composable(
+            route = "taskBoard/{familyId}",
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) {
+            LeaderboardScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = "taskPacks/{familyId}",
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) {
+            StarterPacksScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

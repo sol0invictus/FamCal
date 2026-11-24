@@ -1,5 +1,6 @@
 package com.famcal.app.notifications
 
+import com.famcal.app.widget.TasksWidget
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
@@ -26,6 +27,15 @@ class FamcalMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        if (message.data["type"] == "task") {
+            val familyId = message.data["familyId"] ?: return
+            val title = message.data["title"]
+            if (title != null) {
+                postTaskUpdate(this, familyId, message.data["taskId"], title, message.data["body"].orEmpty())
+            }
+            TasksWidget.requestUpdate(this)
+            return
+        }
         val title = message.notification?.title ?: message.data["title"]
         // Family-update notifications can be switched off in Settings; reminders still refresh.
         if (title != null && NotificationPrefs.updatesEnabled(this)) {

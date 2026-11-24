@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.famcal.app.notifications.ReminderRescheduleWorker
+import com.famcal.app.notifications.TaskDigest
 import com.famcal.app.notifications.createNotificationChannels
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -25,5 +26,6 @@ class FamCalApplication : Application(), Configuration.Provider {
         super.onCreate()
         createNotificationChannels(this)
         ReminderRescheduleWorker.schedulePeriodic(this)
+        TaskDigest.schedule(this)
     }
 }

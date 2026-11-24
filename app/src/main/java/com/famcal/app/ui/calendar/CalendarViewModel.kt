@@ -10,8 +10,15 @@ import com.famcal.app.data.calendar.CalendarMirror
 import com.famcal.app.data.event.EventRepository
 import com.famcal.app.data.family.FamilyRepository
 import com.famcal.app.data.model.CalendarEvent
+import com.famcal.app.data.model.HouseholdTask
 import com.famcal.app.data.model.Member
+import com.famcal.app.data.task.CompletionUndo
+import com.famcal.app.data.task.TaskRepository
 import com.famcal.app.notifications.ReminderScheduler
+import com.famcal.app.ui.tasks.TaskMessage
+import com.famcal.app.ui.tasks.completionMessage
+import com.famcal.app.ui.tasks.isDone
+import com.famcal.app.util.TaskSchedule
 import com.famcal.app.util.EventOccurrence
 import com.famcal.app.util.RecurrenceExpander
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +29,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -31,11 +39,17 @@ data class CalendarUiState(
     val familyName: String = "",
     val membersByUid: Map<String, Member> = emptyMap(),
     val eventsByDay: Map<LocalDate, List<EventOccurrence>> = emptyMap(),
+    /** Open tasks by due date; overdue ones are shown on today. */
+    val tasksByDay: Map<LocalDate, List<HouseholdTask>> = emptyMap(),
+    val currentUid: String = "",
     val selectedDate: LocalDate = LocalDate.now(),
     val isLoading: Boolean = true,
 ) {
     val selectedDayEvents: List<EventOccurrence>
         get() = eventsByDay[selectedDate].orEmpty()
+
+    val selectedDayTasks: List<HouseholdTask>
+        get() = tasksByDay[selectedDate].orEmpty()
 }
 
 @HiltViewModel
@@ -47,6 +61,7 @@ class CalendarViewModel @Inject constructor(
     private val reminderScheduler: ReminderScheduler,
     private val calendarMirror: CalendarMirror,
     private val pendingNavigation: PendingNavigation,
+    private val taskRepository: TaskRepository,
 ) : ViewModel() {
 
     val familyId: String = checkNotNull(savedStateHandle["familyId"]) { "familyId is required" }
@@ -55,6 +70,9 @@ class CalendarViewModel @Inject constructor(
 
     private val _messages = MutableSharedFlow<String>()
     val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    private val _taskMessages = MutableSharedFlow<TaskMessage>()
+    val taskMessages: SharedFlow<TaskMessage> = _taskMessages.asSharedFlow()
 
     /**
      * A tapped notification waiting to be shown. The screen handles it (only while visible),
@@ -67,7 +85,9 @@ class CalendarViewModel @Inject constructor(
         familyRepository.observeMembers(familyId),
         eventRepository.observeEvents(familyId),
         selectedDate,
-    ) { family, members, events, date ->
+        // Starts empty so events never wait on the tasks listener (e.g. rules not yet published).
+        taskRepository.observeTasks(familyId).onStart { emit(emptyList()) },
+    ) { family, members, events, date, tasks ->
         val today = LocalDate.now()
         val occurrences = RecurrenceExpander.expand(
             events = events,
@@ -86,10 +106,17 @@ class CalendarViewModel @Inject constructor(
                 guard++
             }
         }
+        val tasksByDay = tasks
+            .filter { !it.isDone() }
+            .mapNotNull { task -> TaskSchedule.parse(task.dueDate)?.let { due -> maxOf(due, today) to task } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, list) -> list.sortedBy { it.dueDate } }
         CalendarUiState(
             familyName = family?.name.orEmpty(),
             membersByUid = members.associateBy { it.uid },
             eventsByDay = eventsByDay,
+            tasksByDay = tasksByDay,
+            currentUid = authRepository.currentUser?.uid.orEmpty(),
             selectedDate = date,
             isLoading = false,
         )
@@ -122,10 +149,24 @@ class CalendarViewModel @Inject constructor(
 
     /** Selects the notification's day if it's for this family; returns the day if handled. */
     fun handleOpenRequest(request: OpenRequest): LocalDate? {
+        if (request.target != OpenRequest.Target.CALENDAR) return null
         if (request.familyId != null && request.familyId != familyId) return null
+        val date = request.date ?: return null
         pendingNavigation.consume()
-        selectDate(request.date)
-        return request.date
+        selectDate(date)
+        return date
+    }
+
+    fun completeTask(task: HouseholdTask) {
+        viewModelScope.launch {
+            taskRepository.complete(familyId, task)
+                .onSuccess { _taskMessages.emit(TaskMessage(completionMessage(task), it)) }
+                .onFailure { _taskMessages.emit(TaskMessage("Couldn't mark that done.")) }
+        }
+    }
+
+    fun undoTask(undo: CompletionUndo) {
+        viewModelScope.launch { taskRepository.undoComplete(familyId, undo) }
     }
 
     fun deleteEvent(eventId: String) {

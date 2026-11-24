@@ -70,7 +70,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.famcal.app.data.model.Recurrence
+import com.famcal.app.data.model.HouseholdTask
 import com.famcal.app.data.model.Reminders
+import com.famcal.app.ui.tasks.TaskRow
 import com.famcal.app.ui.theme.MemberColors
 import com.famcal.app.util.EventOccurrence
 import com.famcal.app.util.formatDate
@@ -97,6 +99,7 @@ fun CalendarScreen(
     onEventClick: (eventId: String, occurrenceDate: LocalDate?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenTask: (String) -> Unit,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -108,6 +111,16 @@ fun CalendarScreen(
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.taskMessages.collect { message ->
+            val result = snackbarHostState.showSnackbar(
+                message.text,
+                actionLabel = if (message.undo != null) "Undo" else null,
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) message.undo?.let(viewModel::undoTask)
+        }
     }
 
     val currentMonth = remember { YearMonth.now() }
@@ -167,7 +180,9 @@ fun CalendarScreen(
                         day = day,
                         isSelected = day.date == state.selectedDate,
                         dayEvents = state.eventsByDay[day.date].orEmpty()
-                            .map { it.event.title to memberColor(state, it.event.colorUid) },
+                            .map { it.event.title to memberColor(state, it.event.colorUid) } +
+                            state.tasksByDay[day.date].orEmpty()
+                                .map { "✓ ${it.title}" to memberColor(state, it.assignedTo) },
                         onClick = { viewModel.selectDate(day.date) },
                     )
                 },
@@ -179,6 +194,18 @@ fun CalendarScreen(
                 isLoading = state.isLoading,
                 colorFor = { occ -> memberColor(state, occ.event.colorUid) },
                 onOccurrenceClick = { selected = it },
+                tasks = state.selectedDayTasks,
+                taskRow = { task ->
+                    TaskRow(
+                        task = task,
+                        today = LocalDate.now(),
+                        membersByUid = state.membersByUid,
+                        currentUid = state.currentUid,
+                        onCheck = { viewModel.completeTask(task) },
+                        onClick = { onOpenTask(task.id) },
+                        onClaim = { onOpenTask(task.id) },
+                    )
+                },
             )
         }
     }
@@ -534,6 +561,8 @@ private fun AgendaSection(
     isLoading: Boolean,
     colorFor: (EventOccurrence) -> Color,
     onOccurrenceClick: (EventOccurrence) -> Unit,
+    tasks: List<HouseholdTask>,
+    taskRow: @Composable (HouseholdTask) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -545,19 +574,23 @@ private fun AgendaSection(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
-            if (occurrences.isNotEmpty()) {
+            if (occurrences.isNotEmpty() || tasks.isNotEmpty()) {
+                val parts = listOfNotNull(
+                    occurrences.size.takeIf { it > 0 }?.let { if (it == 1) "1 event" else "$it events" },
+                    tasks.size.takeIf { it > 0 }?.let { if (it == 1) "1 task" else "$it tasks" },
+                )
                 Text(
-                    text = if (occurrences.size == 1) "1 event" else "${occurrences.size} events",
+                    text = parts.joinToString(" · "),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        if (isLoading && occurrences.isEmpty()) {
+        if (isLoading && occurrences.isEmpty() && tasks.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else if (occurrences.isEmpty()) {
+        } else if (occurrences.isEmpty() && tasks.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -578,6 +611,7 @@ private fun AgendaSection(
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(tasks, key = { "task-" + it.id }) { task -> taskRow(task) }
                 items(occurrences, key = { it.event.id + it.start.toString() }) { occ ->
                     AgendaRow(
                         occurrence = occ,

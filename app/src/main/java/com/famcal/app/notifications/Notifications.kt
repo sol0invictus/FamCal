@@ -18,12 +18,32 @@ import java.time.LocalDate
 /** Shared notification constants, channels, and helpers. */
 const val CHANNEL_REMINDERS = "reminders"
 const val CHANNEL_UPDATES = "updates"
+const val CHANNEL_TASKS = "tasks"
 
 const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
 const val EXTRA_TITLE = "extra_title"
 const val EXTRA_TEXT = "extra_text"
 const val EXTRA_FAMILY_ID = "extra_family_id"
 const val EXTRA_DATE = "extra_date"
+const val EXTRA_OPEN_TASKS = "extra_open_tasks"
+const val EXTRA_TASK_ID = "extra_task_id"
+
+/** Opens [familyId]'s Tasks tab, or a single task's detail when [taskId] is given. */
+fun openTasksIntent(context: Context, requestCode: Int, familyId: String?, taskId: String? = null): PendingIntent {
+    val intent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
+            Intent.FLAG_ACTIVITY_SINGLE_TOP
+        putExtra(EXTRA_OPEN_TASKS, true)
+        putExtra(EXTRA_FAMILY_ID, familyId)
+        taskId?.let { putExtra(EXTRA_TASK_ID, it) }
+    }
+    return PendingIntent.getActivity(
+        context,
+        requestCode,
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+}
 
 /** Opens the app on [date] in [familyId]'s calendar (handled by [MainActivity]). */
 fun openCalendarIntent(context: Context, requestCode: Int, familyId: String?, date: LocalDate): PendingIntent {
@@ -56,6 +76,13 @@ fun createNotificationChannels(context: Context) {
             "Family updates",
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply { description = "When a family member adds or changes an event" },
+    )
+    manager.createNotificationChannel(
+        NotificationChannel(
+            CHANNEL_TASKS,
+            "Tasks",
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply { description = "Daily task summary, tasks assigned to you, and finished chores" },
     )
 }
 

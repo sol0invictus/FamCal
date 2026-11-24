@@ -18,6 +18,8 @@ import com.famcal.app.data.OpenRequest
 import com.famcal.app.data.PendingNavigation
 import com.famcal.app.notifications.EXTRA_DATE
 import com.famcal.app.notifications.EXTRA_FAMILY_ID
+import com.famcal.app.notifications.EXTRA_OPEN_TASKS
+import com.famcal.app.notifications.EXTRA_TASK_ID
 import com.famcal.app.ui.FamCalRoot
 import com.famcal.app.ui.theme.FamCalTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -48,8 +50,24 @@ class MainActivity : ComponentActivity() {
         handleNotificationTap(intent)
     }
 
-    /** A tapped reminder/update opens that family's calendar on the event's day. */
+    /**
+     * A tapped reminder/update opens that family's calendar on the event's day; a task
+     * notification or the home-screen widget opens the Tasks tab (or one task).
+     */
     private fun handleNotificationTap(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_TASKS, false) == true) {
+            val familyId = intent.getStringExtra(EXTRA_FAMILY_ID)
+            familyId?.let(activeFamilyStore::setActiveFamilyId)
+            pendingNavigation.open(
+                OpenRequest(
+                    familyId = familyId,
+                    target = OpenRequest.Target.TASKS,
+                    taskId = intent.getStringExtra(EXTRA_TASK_ID),
+                ),
+            )
+            intent.removeExtra(EXTRA_OPEN_TASKS)
+            return
+        }
         val date = intent?.getStringExtra(EXTRA_DATE)
             ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
             ?: return

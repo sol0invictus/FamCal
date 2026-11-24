@@ -48,6 +48,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.famcal.app.ui.auth.PasswordResetDialog
+import com.famcal.app.ui.common.TimePickerSheet
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +69,9 @@ fun SettingsScreen(
     var renameText by remember { mutableStateOf("") }
     val context = LocalContext.current
     val resetState by viewModel.passwordReset.state.collectAsStateWithLifecycle()
+    val taskNotifications by viewModel.taskNotifications.collectAsStateWithLifecycle()
+    var pickDigestTime by remember { mutableStateOf(false) }
+    val digestTime = LocalTime.of(taskNotifications.digestMinutes / 60, taskNotifications.digestMinutes % 60)
     PasswordResetDialog(
         state = resetState,
         onEmailChange = viewModel.passwordReset::onEmailChange,
@@ -159,6 +165,35 @@ fun SettingsScreen(
                     subtitle = "When someone adds or changes an event",
                     checked = state.updatesEnabled,
                     onCheckedChange = viewModel::setUpdatesEnabled,
+                )
+                HorizontalDivider()
+                SwitchRow(
+                    title = "Daily task summary",
+                    subtitle = "Your overdue and due-today tasks, with Done buttons",
+                    checked = taskNotifications.reminders,
+                    onCheckedChange = viewModel::setTaskRemindersEnabled,
+                )
+                if (taskNotifications.reminders) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Summary time",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(onClick = { pickDigestTime = true }) {
+                            Text(digestTime.format(DateTimeFormatter.ofPattern("h:mm a")))
+                        }
+                    }
+                }
+                HorizontalDivider()
+                SwitchRow(
+                    title = "Task updates",
+                    subtitle = "When a task is assigned to you or someone finishes one",
+                    checked = taskNotifications.updates,
+                    onCheckedChange = viewModel::setTaskUpdatesEnabled,
                 )
                 if (!systemNotificationsOn) {
                     Text(
@@ -270,6 +305,17 @@ fun SettingsScreen(
                 Text("Delete account", color = MaterialTheme.colorScheme.error)
             }
         }
+    }
+
+    if (pickDigestTime) {
+        TimePickerSheet(
+            initial = digestTime,
+            onConfirm = { time ->
+                viewModel.setDigestTime(time.hour, time.minute)
+                pickDigestTime = false
+            },
+            onDismiss = { pickDigestTime = false },
+        )
     }
 
     if (showRename) {

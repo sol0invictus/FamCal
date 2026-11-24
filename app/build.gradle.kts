@@ -103,7 +103,10 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.kotlinx.coroutines.play.services)
 
+    implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)
+
+    testImplementation(libs.junit)
 }

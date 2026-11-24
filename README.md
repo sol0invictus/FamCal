@@ -30,6 +30,7 @@ events live in a shared cloud store and sync in real time across members' phones
 - **Calendar feed** ✅ *(code complete — needs Blaze plan + deploy)* read-only iCal feed via a Cloud Function so the calendar can be subscribed to from Google/Outlook; subscribe URL appears in Settings. (Alternative to device sync, e.g. for desktop-only accounts.)
 - **Family management** ✅ switch between families, leave a family, create/join more (Settings → Manage families).
 - **M4 — Push** ✅ *(code complete — needs Blaze + deploy)* FCM; the `notifyOnEventWrite` Cloud Function pushes to other members when an event is added/changed. Deployed together with the feed via `firebase deploy --only functions`.
+- **Household tasks** ✅ *(code complete — re-publish rules; push needs functions redeployed)* a **Tasks** tab (Overdue / Today / This week / Later, Mine vs Everyone, area filter) for chores and upkeep: due dates, assignee or "anyone can claim", take-turns rotation, repeat on a fixed schedule or N days/weeks/months *after it's done*, skip/snooze, history ("last done 12 days ago"), notes/cost/vendor phone, points + a family leaderboard, and starter packs (home maintenance, cleaning, kids' chores…). Open tasks also show on the calendar. Daily summary notification with **Done / Tomorrow** buttons, a home-screen widget with checkboxes, and pushes ("New task for you", "Your turn", "Sam finished: …") from the `notifyOnTaskWrite` function.
 - **M5 — Release prep** 🚧 *(engineering done)* release signing, Crashlytics, reboot-safe reminders, hardened security rules, in-app account deletion, privacy policy draft. Remaining is account/listing setup (below).
 - **M6 — Outlook/Gmail two-way import** — optional sync via Microsoft Graph + Google Calendar API.
 
@@ -128,8 +129,15 @@ app/src/main/java/com/famcal/app/
   MainActivity.kt             # single activity, hosts Compose
   ui/theme/                   # Material 3 theme (colors, type)
   ui/navigation/              # NavHost + route definitions
-  ui/calendar/                # calendar screen (placeholder in M0)
+  ui/calendar/                # month view + agenda (events and tasks)
+  ui/tasks/                   # Tasks tab, task editor/detail, leaderboard, starter packs
+  data/task/                  # TaskRepository, starter-pack templates
+  util/TaskSchedule.kt        # pure due-date/rotation logic (unit-tested)
+  notifications/              # reminders, push, daily task summary
+  widget/                     # Glance home-screen tasks widget
 ```
+
+Unit tests: `./gradlew :app:testDebugUnitTest`.
 
 ## Building from the command line (optional)
 
